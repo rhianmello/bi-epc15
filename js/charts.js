@@ -12,12 +12,16 @@
     registry[id] = new Chart(canvas, config);
   }
 
+  function percentValue(value) {
+    return Number.isFinite(value) ? value * 100 : null;
+  }
+
   function unitProgress(units, canvasId, id) {
     replace(id, canvasId, {
       type: 'bar',
       data: { labels: units.map(u => u.code), datasets: [
-        { label: 'Previsto', data: units.map(u => (u.planned ?? 0) * 100), backgroundColor: 'rgba(59,130,246,.78)', borderRadius: 5 },
-        { label: 'Realizado', data: units.map(u => (u.actual ?? 0) * 100), backgroundColor: 'rgba(34,211,238,.8)', borderRadius: 5 }
+        { label: 'Previsto', data: units.map(u => percentValue(u.planned)), backgroundColor: 'rgba(59,130,246,.78)', borderRadius: 5 },
+        { label: 'Realizado', data: units.map(u => percentValue(u.actual)), backgroundColor: 'rgba(34,211,238,.8)', borderRadius: 5 }
       ] },
       options: commonOptions('%')
     });
@@ -29,8 +33,8 @@
     replace('variance', 'variance-chart', {
       type: 'bar',
       data: { labels: units.map(u => u.code), datasets: [{
-        label: 'Desvio (p.p.)', data: units.map(u => (u.variance ?? 0) * 100),
-        backgroundColor: units.map(u => u.variance >= 0 ? cfg.colors.green : u.variance >= cfg.status.attention ? cfg.colors.orange : cfg.colors.red), borderRadius: 5
+        label: 'Desvio (p.p.)', data: units.map(u => percentValue(u.variance)),
+        backgroundColor: units.map(u => !Number.isFinite(u.variance) ? cfg.colors.neutral : u.variance >= 0 ? cfg.colors.green : u.variance >= cfg.status.attention ? cfg.colors.orange : cfg.colors.red), borderRadius: 5
       }] },
       options: commonOptions(' p.p.', true)
     });
@@ -39,8 +43,9 @@
   function commonOptions(suffix, horizontal) {
     return {
       responsive: true, maintainAspectRatio: false, indexAxis: horizontal ? 'y' : 'x',
+      spanGaps: false,
       interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { labels: { usePointStyle: true, boxWidth: 7 } }, tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.raw.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}${suffix}` } } },
+      plugins: { legend: { labels: { usePointStyle: true, boxWidth: 7 } }, tooltip: { callbacks: { label: ctx => Number.isFinite(ctx.raw) ? `${ctx.dataset.label}: ${ctx.raw.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}${suffix}` : `${ctx.dataset.label}: Sem dado` } } },
       scales: { x: { grid: { color: cfg.colors.grid }, ticks: horizontal ? { callback: value => `${value}%` } : {} }, y: { grid: { color: horizontal ? 'transparent' : cfg.colors.grid }, beginAtZero: true, ticks: horizontal ? {} : { callback: value => `${value}%` } } }
     };
   }
