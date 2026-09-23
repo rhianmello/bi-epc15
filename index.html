@@ -14,7 +14,10 @@
       <p class="eyebrow">PLANEJAMENTO E CONTROLE</p>
       <h1>BI EPC-15</h1>
       <p class="lead">Selecione o arquivo de acompanhamento atualizado para carregar o painel.</p>
-      <label class="file-button" for="excel-input">Selecionar Excel</label>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+        <label class="file-button" for="excel-input">Selecionar Excel</label>
+        <a class="file-button" href="rundown.html" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">Abrir BI Rundown</a>
+      </div>
       <input id="excel-input" type="file" accept=".xlsb,.xlsx,.xlsm" hidden>
       <p class="privacy-note">O arquivo é processado somente neste navegador. Nenhum dado é enviado para servidores.</p>
       <div id="upload-error" class="alert hidden" role="alert"></div>
@@ -36,6 +39,7 @@
         <div id="unit-nav"></div>
         <button class="nav-item" data-page="analysis"><span>02</span> Análises</button>
         <button class="nav-item" data-action="presentation"><span>03</span> Modo Apresentação</button>
+        <a class="nav-item" href="rundown.html" style="text-decoration:none"><span>04</span> BI Rundown</a>
       </nav>
       <div class="sidebar-footer">
         <button id="change-file" class="text-button">Trocar arquivo</button>
