@@ -10,16 +10,35 @@
 <body>
   <section id="upload-view" class="upload-view">
     <div class="upload-card">
-      <div class="brand-mark">EPC<span>15</span></div>
-      <p class="eyebrow">PLANEJAMENTO E CONTROLE</p>
-      <h1>BI EPC-15</h1>
-      <p class="lead">Selecione o arquivo de acompanhamento atualizado para carregar o painel.</p>
-      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-        <label class="file-button" for="excel-input">Selecionar Excel</label>
-        <a class="file-button" href="rundown.html" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">Abrir BI Rundown</a>
+      <div class="portal-head">
+        <div class="brand-mark">EPC<span>15</span></div>
+        <p class="eyebrow">PLANEJAMENTO E CONTROLE</p>
+        <h1>Painéis de Planejamento</h1>
+        <p class="lead">Escolha o painel que deseja utilizar.</p>
       </div>
+
+      <div class="bi-choice-grid">
+        <article class="bi-choice-card">
+          <span class="bi-choice-tag">PLANO DE ATAQUE</span>
+          <h2>BI EPC-15</h2>
+          <p>Visão executiva do acompanhamento físico, unidades, fases, desvios e detalhamento do Plano de Ataque.</p>
+          <div class="bi-choice-actions">
+            <label class="file-button" for="excel-input">Selecionar Excel</label>
+          </div>
+        </article>
+
+        <article class="bi-choice-card">
+          <span class="bi-choice-tag">PRIMAVERA • RUNDOWN</span>
+          <h2>BI Rundown</h2>
+          <p>Produção semanal, saldo restante, curvas Previsto/Realizado/Projetado e Rundown por atividade.</p>
+          <div class="bi-choice-actions">
+            <a class="file-button" href="rundown.html">Abrir BI Rundown</a>
+          </div>
+        </article>
+      </div>
+
       <input id="excel-input" type="file" accept=".xlsb,.xlsx,.xlsm" hidden>
-      <p class="privacy-note">O arquivo é processado somente neste navegador. Nenhum dado é enviado para servidores.</p>
+      <p class="privacy-note">Os arquivos são processados somente neste navegador. Nenhum dado é enviado para servidores.</p>
       <div id="upload-error" class="alert hidden" role="alert"></div>
     </div>
   </section>
