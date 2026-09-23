@@ -244,9 +244,28 @@ function setActiveUnit(unit){
   buildUnitNav();
   $('fDisc').value='';
   refreshActivities();
-  $('fAtiv').value='';$('fId').value='';$('idSearch').value='';
+
+  // Ao trocar de unidade, usa os dados já carregados em memória.
+  // Seleciona automaticamente a primeira atividade/ID da unidade e renderiza.
+  const firstIdOption=[...$('fId').options].find(o=>o.value);
+  if(firstIdOption){
+    $('fId').value=firstIdOption.value;
+    syncById();
+    $('idSearch').value=firstIdOption.value;
+    setStatus(activeUnit
+      ?`Unidade ${activeUnit} selecionada • exibindo ${firstIdOption.value}.`
+      :`Todas as unidades • exibindo ${firstIdOption.value}.`);
+    render();
+    return;
+  }
+
+  $('fAtiv').value='';
+  $('fId').value='';
+  $('idSearch').value='';
   clearRender();
-  setStatus(activeUnit?`Unidade ${activeUnit} selecionada. Escolha uma atividade ou cole um ID.`:'Todas as unidades selecionadas. Escolha uma atividade ou cole um ID.');
+  setStatus(activeUnit
+    ?`Nenhuma atividade encontrada para a unidade ${activeUnit}.`
+    :'Nenhuma atividade disponível.');
 }
 function loadFilters(){optionFill($('fDisc'),uniq([...activities.values()].map(a=>(meta20.get(a.id)||{}).disciplina)),'Todas');buildUnitNav();refreshActivities();const weeks=uniq([...activities.values()].flatMap(a=>a.times.map(t=>t.week))).sort((a,b)=>a-b);optionFill($('fIni'),weeks,'Automática');optionFill($('fFim'),weeks,'Automática')}
 function refreshActivities(){const d=$('fDisc').value;let arr=[...activities.values()].filter(a=>(!activeUnit||getUnitFromId(a.id)===activeUnit)&&(!d||(meta20.get(a.id)||{}).disciplina===d));optionFill($('fAtiv'),uniq(arr.map(a=>a.name)),'Selecione...');optionFill($('fId'),uniq(arr.map(a=>a.id)),'Selecione...')}
@@ -394,7 +413,12 @@ $('fileInput').addEventListener('change',async e=>{
     render();
   }catch(err){console.error(err);show(err.message||'Falha ao ler o arquivo.');setStatus('Falha na leitura.');clearRender()}
 });
-$('fDisc').addEventListener('change',()=>{refreshActivities();render()});$('fAtiv').addEventListener('change',()=>{syncByActivity();if($('fId').value)$('idSearch').value=$('fId').value;render()});$('fId').addEventListener('change',()=>{syncById();render()});$('fIni').addEventListener('change',render);$('fFim').addEventListener('change',render);
+$('fDisc').addEventListener('change',()=>{
+  refreshActivities();
+  const first=[...$('fId').options].find(o=>o.value);
+  if(first){$('fId').value=first.value;syncById();$('idSearch').value=first.value;render();}
+  else clearRender();
+});$('fAtiv').addEventListener('change',()=>{syncByActivity();if($('fId').value)$('idSearch').value=$('fId').value;render()});$('fId').addEventListener('change',()=>{syncById();render()});$('fIni').addEventListener('change',render);$('fFim').addEventListener('change',render);
 $('btnIdSearch').addEventListener('click',searchId);
 $('idSearch').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();searchId()}});
 $('idSearch').addEventListener('paste',()=>{setTimeout(searchId,0)});
