@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07111f">
+  <title>BI EPC-15</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <section id="upload-view" class="upload-view">
+    <div class="upload-card">
+      <div class="brand-mark">EPC<span>15</span></div>
+      <p class="eyebrow">PLANEJAMENTO E CONTROLE</p>
+      <h1>BI EPC-15</h1>
+      <p class="lead">Selecione o arquivo de acompanhamento atualizado para carregar o painel.</p>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+        <label class="file-button" for="excel-input">Selecionar Excel</label>
+        <a class="file-button" href="rundown.html" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">Abrir BI Rundown</a>
+      </div>
+      <input id="excel-input" type="file" accept=".xlsb,.xlsx,.xlsm" hidden>
+      <p class="privacy-note">O arquivo é processado somente neste navegador. Nenhum dado é enviado para servidores.</p>
+      <div id="upload-error" class="alert hidden" role="alert"></div>
+    </div>
+  </section>
+
+  <div id="loading" class="loading hidden" aria-live="polite">
+    <div class="spinner"></div>
+    <strong>Analisando o arquivo...</strong>
+    <span>Validando abas, hierarquia e indicadores.</span>
+  </div>
+
+  <div id="app-shell" class="app-shell hidden">
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-brand"><span>BI</span> EPC-15</div>
+      <nav class="main-nav" aria-label="Navegação principal">
+        <button class="nav-item active" data-page="executive"><span>01</span> Visão Executiva</button>
+        <div class="nav-group-label">UNIDADES</div>
+        <div id="unit-nav"></div>
+        <button class="nav-item" data-page="analysis"><span>02</span> Análises</button>
+        <button class="nav-item" data-action="presentation"><span>03</span> Modo Apresentação</button>
+        <a class="nav-item" href="rundown.html" style="text-decoration:none"><span>04</span> BI Rundown</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="change-file" class="text-button">Trocar arquivo</button>
+        <span id="file-name"></span>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">CONTRATO EPC-15</p>
+          <h2 id="page-title">Visão Executiva</h2>
+        </div>
+        <div class="topbar-meta">
+          <span>Data-base</span>
+          <strong id="header-date">—</strong>
+        </div>
+      </header>
+
+      <section id="page-executive" class="page active">
+        <div id="executive-kpis" class="kpi-grid"></div>
+        <div class="grid-2 executive-row">
+          <article class="panel progress-panel">
+            <div class="panel-heading"><div><p class="eyebrow">AVANÇO FÍSICO</p><h3>Previsto x realizado</h3></div><span id="progress-status" class="status-pill"></span></div>
+            <div class="progress-comparison">
+              <div><div class="progress-label"><span>Previsto</span><strong id="planned-label">—</strong></div><div class="progress-track"><span id="planned-bar" class="bar planned"></span></div></div>
+              <div><div class="progress-label"><span>Realizado</span><strong id="actual-label">—</strong></div><div class="progress-track"><span id="actual-bar" class="bar actual"></span></div></div>
+              <div class="variance-callout"><span>Desvio</span><strong id="variance-label">—</strong></div>
+            </div>
+          </article>
+          <article class="panel chart-panel"><div class="panel-heading"><div><p class="eyebrow">COMPARATIVO</p><h3>Avanço por unidade</h3></div></div><div class="chart-wrap"><canvas id="units-progress-chart"></canvas></div></article>
+        </div>
+        <article class="panel">
+          <div class="panel-heading"><div><p class="eyebrow">PORTFÓLIO</p><h3>Resumo das unidades</h3></div><button class="sort-button" id="sort-units">Ordenar por desvio</button></div>
+          <div class="table-wrap"><table><thead><tr><th>Unidade</th><th>Previsto</th><th>Realizado</th><th>Desvio</th><th>Valor previsto</th><th>Status</th></tr></thead><tbody id="units-table"></tbody></table></div>
+        </article>
+        <div class="grid-2">
+          <article class="panel"><div class="panel-heading"><div><p class="eyebrow">ATENÇÃO</p><h3>Maiores desvios</h3></div></div><div id="worst-ranking" class="ranking-list"></div></article>
+          <article class="panel"><div class="panel-heading"><div><p class="eyebrow">DESTAQUE</p><h3>Melhores avanços</h3></div></div><div id="best-ranking" class="ranking-list"></div></article>
+        </div>
+      </section>
+
+      <section id="page-unit" class="page">
+        <div id="unit-kpis" class="kpi-grid"></div>
+        <div class="grid-2">
+          <article class="panel"><div class="panel-heading"><div><p class="eyebrow">FASES</p><h3>Previsto x realizado</h3></div></div><div class="chart-wrap tall"><canvas id="phase-chart"></canvas></div></article>
+          <article class="panel"><div class="panel-heading"><div><p class="eyebrow">DESEMPENHO</p><h3>Fases da unidade</h3></div></div><div class="table-wrap compact"><table><thead><tr><th>Fase</th><th>Prev.</th><th>Real.</th><th>Desvio</th><th>Status</th></tr></thead><tbody id="phase-table"></tbody></table></div></article>
+        </div>
+        <article class="panel">
+          <div class="panel-heading"><div><p class="eyebrow">DETALHAMENTO</p><h3>Itens de medição</h3></div><span id="detail-count" class="muted"></span></div>
+          <div id="unit-filters" class="filters"></div>
+          <div class="table-wrap detail-table"><table><thead><tr><th>Fase</th><th>Subfase</th><th>Agrupamento</th><th>Componente</th><th>Etapa</th><th>Critério</th><th>Prev.</th><th>Real.</th><th>Desvio</th><th>Qtd. prev.</th><th>Qtd. real</th><th>Unid.</th></tr></thead><tbody id="detail-body"></tbody></table></div>
+        </article>
+      </section>
+
+      <section id="page-analysis" class="page">
+        <div class="grid-2">
+          <article class="panel"><div class="panel-heading"><div><p class="eyebrow">UNIDADES</p><h3>Previsto x realizado</h3></div></div><div class="chart-wrap tall"><canvas id="analysis-progress-chart"></canvas></div></article>
+          <article class="panel"><div class="panel-heading"><div><p class="eyebrow">UNIDADES</p><h3>Desvio em pontos percentuais</h3></div></div><div class="chart-wrap tall"><canvas id="variance-chart"></canvas></div></article>
+        </div>
+        <article class="panel methodology">
+          <p class="eyebrow">CRITÉRIO DE LEITURA</p>
+          <h3>Hierarquia sem dupla contagem</h3>
+          <p>Os resumos utilizam exclusivamente as linhas consolidadas do primeiro bloco hierárquico da aba <strong>Avanço PLATAQ</strong>. O detalhamento mostra somente linhas-folha. O segundo bloco, reorganizado por disciplina, não é somado novamente.</p>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <section id="presentation" class="presentation hidden" aria-label="Modo apresentação">
+    <div id="slides" class="slides"></div>
+    <div class="presentation-controls">
+      <button id="prev-slide">← Anterior</button>
+      <span id="slide-counter">1 / 1</span>
+      <button id="next-slide">Próximo →</button>
+      <button id="fullscreen">Tela cheia</button>
+      <button id="export-pdf">Exportar PDF</button>
+      <button id="close-presentation">Fechar</button>
+    </div>
+  </section>
+
+  <script src="vendor/xlsx.full.min.js"></script>
+  <script src="vendor/chart.umd.min.js"></script>
+  <script src="vendor/html2canvas.min.js"></script>
+  <script src="vendor/jspdf.umd.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/excel-reader.js"></script>
+  <script src="js/data-model.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/presentation.js"></script>
+  <script src="js/export.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
