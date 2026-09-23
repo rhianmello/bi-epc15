@@ -70,3 +70,13 @@ As bibliotecas usadas na leitura do Excel, nos gráficos e na exportação PDF e
 ## Segurança
 
 Planilhas, CSVs, arquivos de ambiente e logs estão bloqueados no `.gitignore`. Não inclua o Excel oficial no repositório.
+
+
+## BI Rundown
+
+O arquivo `rundown.html` contém o painel de rundown desenvolvido para leitura local das abas:
+
+- `20_Planejamento-curvas_rundown`;
+- `21_Planejamento-curvas_S_Física`.
+
+O painel cruza as atividades pelo ID Primavera, exibe produção semanal e curvas de saldo restante, monta a Rundown consolidada, permite busca direta por ID e exportação dos gráficos em PNG/PDF.
