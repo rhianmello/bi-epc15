@@ -23,7 +23,7 @@
           <h2>BI EPC-15</h2>
           <p>Visão executiva do acompanhamento físico, unidades, fases, desvios e detalhamento do Plano de Ataque.</p>
           <div class="bi-choice-actions">
-            <label class="file-button" for="excel-input">Selecionar Excel</label>
+            <button class="file-button" id="open-epc-dashboard" type="button">Abrir BI EPC-15</button>
           </div>
         </article>
 
@@ -72,13 +72,24 @@
           <p class="eyebrow">CONTRATO EPC-15</p>
           <h2 id="page-title">Visão Executiva</h2>
         </div>
-        <div class="topbar-meta">
-          <span>Data-base</span>
-          <strong id="header-date">—</strong>
+        <div class="topbar-actions">
+          <button id="select-excel-dashboard" class="dashboard-file-button" type="button">Selecionar Excel</button>
+          <div class="topbar-meta">
+            <span>Data-base</span>
+            <strong id="header-date">—</strong>
+          </div>
         </div>
       </header>
 
       <section id="page-executive" class="page active">
+        <div id="dashboard-empty" class="dashboard-empty">
+          <div>
+            <p class="eyebrow">BI EPC-15</p>
+            <h3>Carregue o arquivo do Plano de Ataque</h3>
+            <p>O painel está aberto. Selecione o Excel atualizado para preencher os indicadores, gráficos e unidades.</p>
+          </div>
+          <button id="select-excel-empty" class="dashboard-file-button" type="button">Selecionar Excel</button>
+        </div>
         <div id="executive-kpis" class="kpi-grid"></div>
         <div class="grid-2 executive-row">
           <article class="panel progress-panel">
