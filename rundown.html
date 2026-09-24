@@ -222,86 +222,92 @@ function buildActivity(a){
   const p=curveValues(a,'previsto'),r=curveValues(a,'realizado'),q=curveValues(a,'projetado');
   const total=m.total??null, unit=m.unidade||'und', base=a.base||Math.max(maxCum(p),maxCum(r),maxCum(q));
 
-  // Fallback original: curvas calculadas diretamente da aba 21.
-  let remP=absoluteRemaining(p,base), remRall=absoluteRemaining(r,base), remQ=absoluteRemaining(q,base);
-  let wp=weeklyQty(p,base,total), wr=weeklyQty(r,base,total), wq=weeklyQty(q,base,total);
-  let progR=progressIndices(r), firstR=progR.length?progR[0]:-1, lastR=progR.length?progR[progR.length-1]:-1;
-  let realMax=maxCum(r), hasReal=lastR>=0, completed=base>0&&realMax>=base-1e-6;
-  let currentSaldoQty=total!=null&&base>0?Math.max(0,total*(1-realMax/base)):null;
+  // Curvas do Primavera (aba 21): mantêm a leitura física original do BI.
+  const remP=absoluteRemaining(p,base), remRall=absoluteRemaining(r,base);
+  const progR=progressIndices(r), firstR=progR.length?progR[0]:-1, lastR=progR.length?progR[progR.length-1]:-1;
+  const realMax=maxCum(r), completed=base>0&&realMax>=base-1e-6, hasReal=lastR>=0;
 
-  // Quando a aba 20 possui os saldos calculados, ela é a fonte oficial do Rundown.
-  // Isso mantém o BI exatamente alinhado às colunas F/G/H/I da planilha.
-  const mr=Array.isArray(m.rows)?m.rows:[];
-  if(total!=null&&total>0&&mr.length){
-    const aligned=Array(a.times.length).fill(null);
-    let cursor=-1;
-    for(const row of mr){
-      let found=-1;
-      for(let i=cursor+1;i<a.times.length;i++){if(a.times[i].week===row.week){found=i;break}}
-      if(found<0){for(let i=0;i<a.times.length;i++){if(a.times[i].week===row.week&&!aligned[i]){found=i;break}}}
-      if(found>=0){aligned[found]=row;cursor=found}
-    }
+  // Produção semanal continua vindo diretamente das curvas acumuladas do Primavera.
+  // Isso evita interpretar saldo restante da aba 20 como produção semanal.
+  const wp=weeklyQty(p,base,total), wr=weeklyQty(r,base,total);
 
-    const qtyToPct=v=>v==null?null:Math.max(0,Math.min(100,v/total*100));
-    const pQty=aligned.map(x=>x?.planned??null),rQty=aligned.map(x=>x?.realized??null),qQty=aligned.map(x=>x?.projected??null);
-    const realSemMeta=aligned.map(x=>x?.realSem??null);
+  // A aba 20 é usada somente para a transição do Rundown/Projetado (coluna H).
+  // Como numero_semana da aba 20 corresponde ao cabeçalho da aba 21, alinhamos por semana.
+  const byWeek=new Map((Array.isArray(m.rows)?m.rows:[]).map(x=>[x.week,x]));
+  const projQty=a.times.map(t=>{
+    const row=byWeek.get(t.week);
+    return row&&row.projected!=null?row.projected:null;
+  });
 
-    if(pQty.some(v=>v!=null))remP=pQty.map(qtyToPct);
-    if(rQty.some(v=>v!=null))remRall=rQty.map(qtyToPct);
-    if(qQty.some(v=>v!=null))remQ=qQty.map(qtyToPct);
-
-    const weeklyFromBalance=arr=>arr.map((v,i)=>{
+  // Se houver coluna H calculada na aba 20, ela é a referência do saldo projetado.
+  // Caso contrário, mantém o cálculo anterior diretamente da curva Projetado da aba 21.
+  let remQ, wq;
+  const hasMetaProjection=projQty.some(v=>v!=null);
+  if(hasMetaProjection&&total!=null&&total>0){
+    remQ=projQty.map(v=>v==null?null:Math.max(0,Math.min(100,v/total*100)));
+    wq=projQty.map((v,i)=>{
       if(v==null)return null;
-      for(let j=i+1;j<arr.length;j++){if(arr[j]!=null)return Math.max(0,v-arr[j])}
+      for(let j=i+1;j<projQty.length;j++){
+        if(projQty[j]!=null)return Math.max(0,v-projQty[j]);
+      }
       return 0;
     });
-    if(pQty.some(v=>v!=null))wp=weeklyFromBalance(pQty);
-    if(realSemMeta.some(v=>v!=null))wr=realSemMeta.map(v=>v==null?null:Math.max(0,v));
-    else if(rQty.some(v=>v!=null))wr=weeklyFromBalance(rQty);
-    if(qQty.some(v=>v!=null))wq=weeklyFromBalance(qQty);
-
-    const realProgressIdx=[];
-    for(let i=0;i<realSemMeta.length;i++)if(realSemMeta[i]!=null&&realSemMeta[i]>0)realProgressIdx.push(i);
-    if(realProgressIdx.length){
-      firstR=realProgressIdx[0];
-      lastR=realProgressIdx[realProgressIdx.length-1];
-      hasReal=true;
-      const transition=Math.min(a.times.length-1,lastR+1);
-      const transitionQty=rQty[transition]??rQty[lastR];
-      currentSaldoQty=transitionQty??currentSaldoQty;
-      completed=currentSaldoQty!=null&&currentSaldoQty<=1e-9;
-      realMax=total-currentSaldoQty;
-    }else if(rQty.some(v=>v!=null)){
-      const first=rQty.findIndex(v=>v!=null);
-      const last=[...rQty].map((v,i)=>v!=null?i:-1).filter(i=>i>=0).pop();
-      firstR=first;lastR=last??first;hasReal=true;
-      currentSaldoQty=rQty[lastR]??currentSaldoQty;
-      completed=currentSaldoQty!=null&&currentSaldoQty<=1e-9;
-      realMax=total-currentSaldoQty;
-    }
+  }else{
+    remQ=absoluteRemaining(q,base);
+    wq=weeklyQty(q,base,total);
   }
 
-  // Mostra o Realizado somente até o ponto de transição.
-  const transitionIdx=hasReal?Math.min(a.times.length-1,lastR+1):-1;
-  const remR=remRall.map((v,i)=>hasReal&&i<=transitionIdx?v:null);
+  // Realizado restante aparece somente até a última semana que efetivamente teve avanço.
+  const remR=remRall.map((v,i)=>hasReal&&i<=lastR?v:null);
 
-  // Rundown: Realizado até a transição; a partir dali usa o Projetado da aba 20.
+  // Rundown = Realizado até a última semana real; depois assume a coluna H da aba 20.
   const run=Array(a.times.length).fill(null);
   if(hasReal){
-    for(let i=firstR;i<=transitionIdx;i++)if(remRall[i]!=null)run[i]=remRall[i];
-    if(completed){
-      run[transitionIdx]=0;
-    }else{
-      for(let i=transitionIdx;i<a.times.length;i++){
-        if(remQ[i]!=null){run[i]=remQ[i];if(remQ[i]<=0)break}
-      }
-    }
-  }else{
-    const fq=firstPositive(remQ);if(fq>=0){for(let i=fq;i<a.times.length;i++){if(remQ[i]!=null){run[i]=remQ[i];if(remQ[i]<=0)break}}}
+    for(let i=firstR;i<=lastR;i++)run[i]=remRall[i];
   }
 
-  const rows=a.times.map((t,i)=>({i,...t,prev:remP[i],real:remR[i],proj:remQ[i],run:run[i],prevSem:wp[i],realSem:wr[i],projSem:wq[i]}));
-  return {id:a.id,name:a.name,disc:m.disciplina||'',total,unit,base,realMax,completed,hasReal,lastR,currentSaldoQty,rows};
+  let firstProj=-1;
+  if(hasMetaProjection){
+    firstProj=remQ.findIndex(v=>v!=null);
+    if(firstProj>=0){
+      for(let i=firstProj;i<remQ.length;i++){
+        if(remQ[i]!=null){
+          run[i]=remQ[i];
+          if(remQ[i]<=0)break;
+        }
+      }
+    }
+  }else if(hasReal){
+    const switchIdx=Math.min(a.times.length-1,lastR+1);
+    for(let i=switchIdx+1;i<a.times.length;i++){
+      if(remQ[i]!=null){run[i]=remQ[i];if(remQ[i]<=0)break}
+    }
+  }else{
+    const fq=firstPositive(remQ);
+    if(fq>=0)for(let i=fq;i<a.times.length;i++){if(remQ[i]!=null){run[i]=remQ[i];if(remQ[i]<=0)break}}
+  }
+
+  // Saldo exibido no KPI é o primeiro saldo projetado válido da aba 20.
+  // Ex.: U8224-C-000011000 = 62 na S-26.
+  const currentSaldoQty=hasMetaProjection?projQty.find(v=>v!=null):(
+    total!=null&&base>0?Math.max(0,total*(1-realMax/base)):null
+  );
+
+  const rows=a.times.map((t,i)=>({
+    i,...t,
+    prev:remP[i],
+    real:remR[i],
+    proj:remQ[i],
+    run:run[i],
+    prevSem:wp[i],
+    realSem:wr[i],
+    projSem:wq[i]
+  }));
+
+  return {
+    id:a.id,name:a.name,disc:m.disciplina||'',total,unit,base,
+    realMax,completed,hasReal,lastR,firstProj,currentSaldoQty,rows
+  };
 }
 function isRelevant(x){return [x.prev,x.real,x.proj,x.run,x.prevSem,x.realSem,x.projSem].some(v=>v!=null&&(typeof v!=='number'||Math.abs(v)>1e-9))||[x.prev,x.real,x.proj,x.run].some(v=>v===0)}
 function filterWindow(rows){
@@ -433,14 +439,36 @@ function searchId(){
 function selected(){let id=$('fId').value;if(id&&activities.has(id))return activities.get(id);const name=$('fAtiv').value;if(name){const arr=[...activities.values()].filter(a=>a.name===name);if(arr.length===1){$('fId').value=arr[0].id;return arr[0]}}return null}
 function render(){
   const a=selected();if(!a){clearRender();return}const b=buildActivity(a);current=b;
-  const ini=nval($('fIni').value),fim=nval($('fFim').value);let rows=filterWindow(b.rows).filter(x=>(ini==null||x.week>=ini)&&(fim==null||x.week<=fim));const view=compactRows(rows);
-  const saldoQty=b.currentSaldoQty!=null?b.currentSaldoQty:(b.total!=null&&b.base>0?Math.max(0,b.total*(1-b.realMax/b.base)):null);
-  const realPct=b.total>0&&saldoQty!=null?Math.max(0,Math.min(100,(b.total-saldoQty)/b.total*100)):(b.base>0?Math.min(100,b.realMax/b.base*100):null);
-  const saldoPct=realPct==null?null:Math.max(0,100-realPct);
-  const status=!b.hasReal?'Não iniciado':b.completed?'Concluído':'Em andamento';const lastReal=b.lastR>=0?b.rows[b.lastR].label:'—';const z=b.rows.find(x=>x.run===0);
-  $('kTotal').textContent=fmt(b.total);$('kUnid').textContent=b.unit;$('kExec').textContent=realPct==null?'—':fmt(realPct,1)+'%';$('kSaldo').textContent=saldoQty!=null?fmt(saldoQty):saldoPct==null?'—':fmt(saldoPct,1)+'%';$('kStatus').textContent=status;$('kUltReal').textContent=lastReal;$('kFimRun').textContent=z?z.label:'—';
-  $('title').textContent=b.name;$('subtitle').textContent=`${b.disc||'Sem disciplina'} • ID ${b.id} • saldos F/G/H: ${S20} • curvas Primavera: ${S21}`;$('badge').textContent=b.id;
-  drawMix(view,b.unit);drawRun(view);drawSem(view,b.unit);drawTable(view,b.unit);$('btnPng').disabled=false;$('btnPdf').disabled=false;
+  const ini=nval($('fIni').value),fim=nval($('fFim').value);
+  let rows=filterWindow(b.rows).filter(x=>(ini==null||x.week>=ini)&&(fim==null||x.week<=fim));
+  const view=compactRows(rows);
+
+  // Executado permanece fiel à curva Realizado da aba 21.
+  const realPct=b.base>0?Math.min(100,b.realMax/b.base*100):null;
+  const saldoQty=b.currentSaldoQty;
+
+  const status=!b.hasReal?'Não iniciado':b.completed?'Concluído':'Em andamento';
+  const lastReal=b.lastR>=0?b.rows[b.lastR].label:'—';
+  const z=b.rows.find(x=>x.run===0);
+
+  $('kTotal').textContent=fmt(b.total);
+  $('kUnid').textContent=b.unit;
+  $('kExec').textContent=realPct==null?'—':fmt(realPct,1)+'%';
+  $('kSaldo').textContent=saldoQty!=null?fmt(saldoQty):'—';
+  $('kStatus').textContent=status;
+  $('kUltReal').textContent=lastReal;
+  $('kFimRun').textContent=z?z.label:'—';
+
+  $('title').textContent=b.name;
+  $('subtitle').textContent=`${b.disc||'Sem disciplina'} • ID ${b.id} • realizado/produção semanal: ${S21} • saldo projetado do Rundown: ${S20}`;
+  $('badge').textContent=b.id;
+
+  drawMix(view,b.unit);
+  drawRun(view);
+  drawSem(view,b.unit);
+  drawTable(view,b.unit);
+  $('btnPng').disabled=false;
+  $('btnPdf').disabled=false;
 }
 function clearRender(){current=null;['kTotal','kExec','kSaldo','kStatus','kUltReal','kFimRun'].forEach(x=>$(x).textContent='—');$('kUnid').textContent='—';$('title').textContent='Rundown';$('subtitle').textContent='Selecione uma atividade.';$('badge').textContent='SEM DADOS';$('emptyMix').style.display='grid';$('emptyRun').style.display='grid';$('emptySem').style.display='grid';$('tableWrap').style.display='none';if(chartMix){chartMix.destroy();chartMix=null}if(chartRun){chartRun.destroy();chartRun=null}if(chartSem){chartSem.destroy();chartSem=null}}
 function chartData(view,key){return view.map(x=>x.gap?null:x[key])}
