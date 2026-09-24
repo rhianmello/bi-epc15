@@ -5,6 +5,37 @@
   const loading = document.getElementById('loading');
   const errorBox = document.getElementById('upload-error');
   const openEpc = document.getElementById('open-epc-dashboard');
+  const openRundown = document.getElementById('open-rundown-dashboard');
+  const loginGate = document.getElementById('login-gate');
+  const loginForm = document.getElementById('login-form');
+  const loginUser = document.getElementById('login-user');
+  const loginPass = document.getElementById('login-pass');
+  const loginError = document.getElementById('login-error');
+  const loginCancel = document.getElementById('login-cancel');
+  const AUTH_KEY = 'bi_epc15_basic_auth';
+  let pendingAccess = null;
+
+  function isAuthenticated() {
+    return sessionStorage.getItem(AUTH_KEY) === '1';
+  }
+
+  function requestAccess(action) {
+    if (isAuthenticated()) {
+      action();
+      return;
+    }
+    pendingAccess = action;
+    loginError?.classList.add('hidden');
+    loginGate?.classList.remove('hidden');
+    setTimeout(() => loginUser?.focus(), 0);
+  }
+
+  function closeLogin() {
+    pendingAccess = null;
+    loginGate?.classList.add('hidden');
+    if (loginPass) loginPass.value = '';
+    if (loginError) loginError.classList.add('hidden');
+  }
   const selectDashboard = document.getElementById('select-excel-dashboard');
   const selectEmpty = document.getElementById('select-excel-empty');
   const emptyState = document.getElementById('dashboard-empty');
@@ -35,7 +66,30 @@
   }
 
   input.addEventListener('change', event => { const file=event.target.files?.[0]; if(file) load(file); });
-  openEpc?.addEventListener('click', openDashboard);
+  openEpc?.addEventListener('click', () => requestAccess(openDashboard));
+  openRundown?.addEventListener('click', event => {
+    event.preventDefault();
+    const href = openRundown.href;
+    requestAccess(() => { window.location.href = href; });
+  });
+  loginForm?.addEventListener('submit', event => {
+    event.preventDefault();
+    const user = (loginUser?.value || '').trim();
+    const pass = loginPass?.value || '';
+    if (user.toLowerCase() === 'admin' && pass === '12345678') {
+      sessionStorage.setItem(AUTH_KEY, '1');
+      loginGate?.classList.add('hidden');
+      loginError?.classList.add('hidden');
+      if (loginPass) loginPass.value = '';
+      const action = pendingAccess;
+      pendingAccess = null;
+      if (action) action();
+    } else {
+      loginError?.classList.remove('hidden');
+      loginPass?.select();
+    }
+  });
+  loginCancel?.addEventListener('click', closeLogin);
   selectDashboard?.addEventListener('click', () => input.click());
   selectEmpty?.addEventListener('click', () => input.click());
   document.getElementById('change-file').addEventListener('click', () => input.click());
