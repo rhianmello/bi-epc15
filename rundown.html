@@ -150,15 +150,35 @@ function parseDate(v){if(v instanceof Date)return v;if(typeof v==='number'&&v>20
 function yearOf(v){const d=parseDate(v);return d?d.getUTCFullYear():null}
 function weekLabel(w,y,duplicate){return duplicate&&y?`S-${w}/${String(y).slice(-2)}`:`S-${w}`}
 function parseSheet20(ws){
-  setStatus('Indexando aba 20 — metadados…');
+  setStatus('Indexando aba 20 — metadados e saldos do Rundown…');
   const rg=getRange(ws),hr=findHeaderRowWs(ws,['numero_semana','atividade','quantidade_total'],60);if(hr<0){const rg0=getRange(ws);const pv=[];for(let rr=rg0.s.r;rr<=Math.min(rg0.e.r,rg0.s.r+12);rr++){pv.push(rowValues(ws,rr,rg0.s.c,Math.min(rg0.e.c,rg0.s.c+14)).map(v=>String(v??'')).join(' | '));}throw new Error('Cabeçalho da aba 20 não encontrado. Primeiras linhas lidas: '+pv.join(' / '));}
   const h=rowValues(ws,hr,rg.s.c,rg.e.c),off=rg.s.c;
   const idx=(aliases,contains=false)=>{const i=colIndexVals(h,aliases,contains);return i<0?-1:i+off};
-  const cId=idx(['primavera_p6_id_atividade','primavera_p6_id_ativi','id_da_atividade','id']),cDisc=idx(['disciplina']),cAt=idx(['atividade']),cTot=idx(['quantidade_total']),cUn=idx(['unidade_de_medida','unidade_medida','unidade']);
+  const cId=idx(['primavera_p6_id_atividade','primavera_p6_id_ativi','id_da_atividade','id']),
+        cDisc=idx(['disciplina']),cAt=idx(['atividade']),cTot=idx(['quantidade_total']),
+        cUn=idx(['unidade_de_medida','unidade_medida','unidade']),cWeek=idx(['numero_semana']),
+        cPlan=idx(['quantidade_planejada']),cReal=idx(['quantidade_realizada']),
+        cProj=idx(['quantidade_projetada']),cRealSem=idx(['real_acumulado','real_sem','realizado_semanal']);
   const map=new Map();
   for(let r=hr+1;r<=rg.e.r;r++){
-    const id=String(getCell(ws,r,cId)??'').trim();if(!id)continue;const old=map.get(id)||{};const total=nval(getCell(ws,r,cTot));
-    map.set(id,{disciplina:String(getCell(ws,r,cDisc)??old.disciplina??'').trim(),atividade20:String(getCell(ws,r,cAt)??old.atividade20??'').trim(),total:total??old.total??null,unidade:String(getCell(ws,r,cUn)??old.unidade??'').trim()});
+    const id=String(getCell(ws,r,cId)??'').trim();if(!id)continue;
+    const old=map.get(id)||{rows:[]},total=nval(getCell(ws,r,cTot));
+    const item={
+      disciplina:String(getCell(ws,r,cDisc)??old.disciplina??'').trim(),
+      atividade20:String(getCell(ws,r,cAt)??old.atividade20??'').trim(),
+      total:total??old.total??null,
+      unidade:String(getCell(ws,r,cUn)??old.unidade??'').trim(),
+      rows:old.rows||[]
+    };
+    const week=cWeek>=0?nval(getCell(ws,r,cWeek)):null;
+    if(week!=null)item.rows.push({
+      week:Math.round(week),
+      planned:cPlan>=0?nval(getCell(ws,r,cPlan)):null,
+      realized:cReal>=0?nval(getCell(ws,r,cReal)):null,
+      projected:cProj>=0?nval(getCell(ws,r,cProj)):null,
+      realSem:cRealSem>=0?nval(getCell(ws,r,cRealSem)):null
+    });
+    map.set(id,item);
   }
   return map;
 }
@@ -201,27 +221,87 @@ function buildActivity(a){
   const m=meta20.get(a.id)||{};
   const p=curveValues(a,'previsto'),r=curveValues(a,'realizado'),q=curveValues(a,'projetado');
   const total=m.total??null, unit=m.unidade||'und', base=a.base||Math.max(maxCum(p),maxCum(r),maxCum(q));
-  const remP=absoluteRemaining(p,base), remRall=absoluteRemaining(r,base), remQ=absoluteRemaining(q,base);
-  const progR=progressIndices(r), firstR=progR.length?progR[0]:-1, lastR=progR.length?progR[progR.length-1]:-1;
-  const realMax=maxCum(r), completed=base>0&&realMax>=base-1e-6, hasReal=lastR>=0;
-  // Realizado de referência só até a semana seguinte ao último avanço, evitando patamar repetido indefinidamente.
-  const remR=remRall.map((v,i)=>hasReal&&i<=Math.min(a.times.length-1,lastR+1)?v:null);
+
+  // Fallback original: curvas calculadas diretamente da aba 21.
+  let remP=absoluteRemaining(p,base), remRall=absoluteRemaining(r,base), remQ=absoluteRemaining(q,base);
+  let wp=weeklyQty(p,base,total), wr=weeklyQty(r,base,total), wq=weeklyQty(q,base,total);
+  let progR=progressIndices(r), firstR=progR.length?progR[0]:-1, lastR=progR.length?progR[progR.length-1]:-1;
+  let realMax=maxCum(r), hasReal=lastR>=0, completed=base>0&&realMax>=base-1e-6;
+  let currentSaldoQty=total!=null&&base>0?Math.max(0,total*(1-realMax/base)):null;
+
+  // Quando a aba 20 possui os saldos calculados, ela é a fonte oficial do Rundown.
+  // Isso mantém o BI exatamente alinhado às colunas F/G/H/I da planilha.
+  const mr=Array.isArray(m.rows)?m.rows:[];
+  if(total!=null&&total>0&&mr.length){
+    const aligned=Array(a.times.length).fill(null);
+    let cursor=-1;
+    for(const row of mr){
+      let found=-1;
+      for(let i=cursor+1;i<a.times.length;i++){if(a.times[i].week===row.week){found=i;break}}
+      if(found<0){for(let i=0;i<a.times.length;i++){if(a.times[i].week===row.week&&!aligned[i]){found=i;break}}}
+      if(found>=0){aligned[found]=row;cursor=found}
+    }
+
+    const qtyToPct=v=>v==null?null:Math.max(0,Math.min(100,v/total*100));
+    const pQty=aligned.map(x=>x?.planned??null),rQty=aligned.map(x=>x?.realized??null),qQty=aligned.map(x=>x?.projected??null);
+    const realSemMeta=aligned.map(x=>x?.realSem??null);
+
+    if(pQty.some(v=>v!=null))remP=pQty.map(qtyToPct);
+    if(rQty.some(v=>v!=null))remRall=rQty.map(qtyToPct);
+    if(qQty.some(v=>v!=null))remQ=qQty.map(qtyToPct);
+
+    const weeklyFromBalance=arr=>arr.map((v,i)=>{
+      if(v==null)return null;
+      for(let j=i+1;j<arr.length;j++){if(arr[j]!=null)return Math.max(0,v-arr[j])}
+      return 0;
+    });
+    if(pQty.some(v=>v!=null))wp=weeklyFromBalance(pQty);
+    if(realSemMeta.some(v=>v!=null))wr=realSemMeta.map(v=>v==null?null:Math.max(0,v));
+    else if(rQty.some(v=>v!=null))wr=weeklyFromBalance(rQty);
+    if(qQty.some(v=>v!=null))wq=weeklyFromBalance(qQty);
+
+    const realProgressIdx=[];
+    for(let i=0;i<realSemMeta.length;i++)if(realSemMeta[i]!=null&&realSemMeta[i]>0)realProgressIdx.push(i);
+    if(realProgressIdx.length){
+      firstR=realProgressIdx[0];
+      lastR=realProgressIdx[realProgressIdx.length-1];
+      hasReal=true;
+      const transition=Math.min(a.times.length-1,lastR+1);
+      const transitionQty=rQty[transition]??rQty[lastR];
+      currentSaldoQty=transitionQty??currentSaldoQty;
+      completed=currentSaldoQty!=null&&currentSaldoQty<=1e-9;
+      realMax=total-currentSaldoQty;
+    }else if(rQty.some(v=>v!=null)){
+      const first=rQty.findIndex(v=>v!=null);
+      const last=[...rQty].map((v,i)=>v!=null?i:-1).filter(i=>i>=0).pop();
+      firstR=first;lastR=last??first;hasReal=true;
+      currentSaldoQty=rQty[lastR]??currentSaldoQty;
+      completed=currentSaldoQty!=null&&currentSaldoQty<=1e-9;
+      realMax=total-currentSaldoQty;
+    }
+  }
+
+  // Mostra o Realizado somente até o ponto de transição.
+  const transitionIdx=hasReal?Math.min(a.times.length-1,lastR+1):-1;
+  const remR=remRall.map((v,i)=>hasReal&&i<=transitionIdx?v:null);
+
+  // Rundown: Realizado até a transição; a partir dali usa o Projetado da aba 20.
   const run=Array(a.times.length).fill(null);
   if(hasReal){
-    for(let i=firstR;i<=Math.min(a.times.length-1,lastR+1);i++)run[i]=remRall[i];
+    for(let i=firstR;i<=transitionIdx;i++)if(remRall[i]!=null)run[i]=remRall[i];
     if(completed){
-      const z=Math.min(a.times.length-1,lastR+1);run[z]=0;
+      run[transitionIdx]=0;
     }else{
-      const switchIdx=Math.min(a.times.length-1,lastR+1);
-      // O ponto de transição mantém o saldo real. O Projetado passa a comandar a partir da semana seguinte.
-      for(let i=switchIdx+1;i<a.times.length;i++){if(remQ[i]!=null){run[i]=remQ[i];if(remQ[i]<=0)break}}
+      for(let i=transitionIdx;i<a.times.length;i++){
+        if(remQ[i]!=null){run[i]=remQ[i];if(remQ[i]<=0)break}
+      }
     }
   }else{
-    const fq=firstPositive(q);if(fq>=0){for(let i=fq;i<a.times.length;i++){if(remQ[i]!=null){run[i]=remQ[i];if(remQ[i]<=0)break}}}
+    const fq=firstPositive(remQ);if(fq>=0){for(let i=fq;i<a.times.length;i++){if(remQ[i]!=null){run[i]=remQ[i];if(remQ[i]<=0)break}}}
   }
-  const wp=weeklyQty(p,base,total), wr=weeklyQty(r,base,total), wq=weeklyQty(q,base,total);
+
   const rows=a.times.map((t,i)=>({i,...t,prev:remP[i],real:remR[i],proj:remQ[i],run:run[i],prevSem:wp[i],realSem:wr[i],projSem:wq[i]}));
-  return {id:a.id,name:a.name,disc:m.disciplina||'',total,unit,base,realMax,completed,hasReal,lastR,rows};
+  return {id:a.id,name:a.name,disc:m.disciplina||'',total,unit,base,realMax,completed,hasReal,lastR,currentSaldoQty,rows};
 }
 function isRelevant(x){return [x.prev,x.real,x.proj,x.run,x.prevSem,x.realSem,x.projSem].some(v=>v!=null&&(typeof v!=='number'||Math.abs(v)>1e-9))||[x.prev,x.real,x.proj,x.run].some(v=>v===0)}
 function filterWindow(rows){
@@ -354,10 +434,12 @@ function selected(){let id=$('fId').value;if(id&&activities.has(id))return activ
 function render(){
   const a=selected();if(!a){clearRender();return}const b=buildActivity(a);current=b;
   const ini=nval($('fIni').value),fim=nval($('fFim').value);let rows=filterWindow(b.rows).filter(x=>(ini==null||x.week>=ini)&&(fim==null||x.week<=fim));const view=compactRows(rows);
-  const realPct=b.base>0?Math.min(100,b.realMax/b.base*100):null, saldoPct=realPct==null?null:Math.max(0,100-realPct), saldoQty=b.total!=null&&saldoPct!=null?b.total*saldoPct/100:null;
+  const saldoQty=b.currentSaldoQty!=null?b.currentSaldoQty:(b.total!=null&&b.base>0?Math.max(0,b.total*(1-b.realMax/b.base)):null);
+  const realPct=b.total>0&&saldoQty!=null?Math.max(0,Math.min(100,(b.total-saldoQty)/b.total*100)):(b.base>0?Math.min(100,b.realMax/b.base*100):null);
+  const saldoPct=realPct==null?null:Math.max(0,100-realPct);
   const status=!b.hasReal?'Não iniciado':b.completed?'Concluído':'Em andamento';const lastReal=b.lastR>=0?b.rows[b.lastR].label:'—';const z=b.rows.find(x=>x.run===0);
-  $('kTotal').textContent=fmt(b.total);$('kUnid').textContent=b.unit;$('kExec').textContent=realPct==null?'—':fmt(realPct,1)+'%';$('kSaldo').textContent=b.total!=null?fmt(saldoQty):saldoPct==null?'—':fmt(saldoPct,1)+'%';$('kStatus').textContent=status;$('kUltReal').textContent=lastReal;$('kFimRun').textContent=z?z.label:'—';
-  $('title').textContent=b.name;$('subtitle').textContent=`${b.disc||'Sem disciplina'} • ID ${b.id} • Fonte principal: ${S21}`;$('badge').textContent=b.id;
+  $('kTotal').textContent=fmt(b.total);$('kUnid').textContent=b.unit;$('kExec').textContent=realPct==null?'—':fmt(realPct,1)+'%';$('kSaldo').textContent=saldoQty!=null?fmt(saldoQty):saldoPct==null?'—':fmt(saldoPct,1)+'%';$('kStatus').textContent=status;$('kUltReal').textContent=lastReal;$('kFimRun').textContent=z?z.label:'—';
+  $('title').textContent=b.name;$('subtitle').textContent=`${b.disc||'Sem disciplina'} • ID ${b.id} • saldos F/G/H: ${S20} • curvas Primavera: ${S21}`;$('badge').textContent=b.id;
   drawMix(view,b.unit);drawRun(view);drawSem(view,b.unit);drawTable(view,b.unit);$('btnPng').disabled=false;$('btnPdf').disabled=false;
 }
 function clearRender(){current=null;['kTotal','kExec','kSaldo','kStatus','kUltReal','kFimRun'].forEach(x=>$(x).textContent='—');$('kUnid').textContent='—';$('title').textContent='Rundown';$('subtitle').textContent='Selecione uma atividade.';$('badge').textContent='SEM DADOS';$('emptyMix').style.display='grid';$('emptyRun').style.display='grid';$('emptySem').style.display='grid';$('tableWrap').style.display='none';if(chartMix){chartMix.destroy();chartMix=null}if(chartRun){chartRun.destroy();chartRun=null}if(chartSem){chartSem.destroy();chartSem=null}}
