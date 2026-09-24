@@ -1,6 +1,6 @@
 (function () {
   window.EPC15_CONFIG = Object.freeze({
-    sheets: { primary: 'Avanço PLATAQ', summary: 'PPT_RESUMO' },
+    sheets: { primary: 'Avanço PLATAQ', summary: 'PPT_RESUMO', curves: 'CURVAS' },
     headerSearchLimit: 15,
     columns: {
       level: 3, unit: 4, phase: 5, subphase: 6, grouping: 7,
