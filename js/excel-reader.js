@@ -47,11 +47,184 @@
     }
   }
 
+  function xmlDocument(text) {
+    const doc = new DOMParser().parseFromString(text, 'application/xml');
+    if (doc.getElementsByTagName('parsererror').length) throw new Error('XML inválido no arquivo Excel.');
+    return doc;
+  }
+
+  function localElements(node, name) {
+    return Array.from(node.getElementsByTagNameNS('*', name));
+  }
+
+  function normalizeZipPath(sourcePath, target) {
+    if (!target) return null;
+    if (target.startsWith('/')) return target.replace(/^\/+/, '');
+    const parts = sourcePath.split('/');
+    parts.pop();
+    target.split('/').forEach(part => {
+      if (!part || part === '.') return;
+      if (part === '..') parts.pop();
+      else parts.push(part);
+    });
+    return parts.join('/');
+  }
+
+  function relsPath(sourcePath) {
+    const parts = sourcePath.split('/');
+    const file = parts.pop();
+    return [...parts, '_rels', file + '.rels'].join('/');
+  }
+
+  async function relationshipTarget(zip, sourcePath, relationshipId) {
+    const file = zip.file(relsPath(sourcePath));
+    if (!file) return null;
+    const doc = xmlDocument(await file.async('text'));
+    const rel = localElements(doc, 'Relationship').find(el => el.getAttribute('Id') === relationshipId);
+    return rel ? normalizeZipPath(sourcePath, rel.getAttribute('Target')) : null;
+  }
+
+  function nodeText(node, name) {
+    const el = localElements(node, name)[0];
+    return el ? String(el.textContent || '').trim() : '';
+  }
+
+  function formulaValues(formula, workbook) {
+    if (!formula) return [];
+    const clean = String(formula).replace(/^=/, '').trim();
+    const m = clean.match(/^'?(.+?)'?!(\$?[A-Z]+\$?\d+)(?::(\$?[A-Z]+\$?\d+))?$/);
+    if (!m) return [];
+    const sheetName = m[1].replace(/''/g, "'");
+    const ws = workbook.Sheets[sheetName];
+    if (!ws) return [];
+    const start = XLSX.utils.decode_cell(m[2].replace(/\$/g, ''));
+    const end = XLSX.utils.decode_cell((m[3] || m[2]).replace(/\$/g, ''));
+    const values = [];
+    for (let r = start.r; r <= end.r; r += 1) {
+      for (let c = start.c; c <= end.c; c += 1) {
+        const cell = ws[XLSX.utils.encode_cell({ r, c })];
+        values.push(cell ? (cell.v ?? null) : null);
+      }
+    }
+    return values;
+  }
+
+  function cachedPoints(node, workbook) {
+    if (!node) return [];
+    const cache = localElements(node, 'numCache')[0] || localElements(node, 'strCache')[0];
+    if (cache) {
+      const points = localElements(cache, 'pt').map(pt => ({
+        index: Number(pt.getAttribute('idx') || 0),
+        value: nodeText(pt, 'v')
+      })).sort((a,b) => a.index - b.index);
+      if (points.length) return points.map(p => p.value);
+    }
+    const multi = localElements(node, 'multiLvlStrCache')[0];
+    if (multi) {
+      const level = localElements(multi, 'lvl')[0];
+      if (level) return localElements(level, 'pt').map(pt => nodeText(pt, 'v'));
+    }
+    const formula = nodeText(node, 'f');
+    return formulaValues(formula, workbook);
+  }
+
+  function formatCurveCategory(value) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && numeric > 20000 && numeric < 90000 && XLSX.SSF?.parse_date_code) {
+      const d = XLSX.SSF.parse_date_code(numeric);
+      if (d) return String(d.d).padStart(2,'0') + '/' + String(d.m).padStart(2,'0') + '/' + String(d.y).slice(-2);
+    }
+    return value == null ? '' : String(value);
+  }
+
+  function chartSeries(chartDoc, workbook) {
+    return localElements(chartDoc, 'ser').map((ser, index) => {
+      const tx = localElements(ser, 'tx')[0];
+      let name = tx ? (nodeText(tx, 'v') || cachedPoints(tx, workbook)[0]) : '';
+      if (!name) name = 'Série ' + (index + 1);
+      const cat = localElements(ser, 'cat')[0] || localElements(ser, 'xVal')[0];
+      const val = localElements(ser, 'val')[0] || localElements(ser, 'yVal')[0];
+      const categories = cachedPoints(cat, workbook).map(formatCurveCategory);
+      const values = cachedPoints(val, workbook).map(v => {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : null;
+      });
+      return { name: String(name).trim(), categories, values };
+    }).filter(s => s.values.some(Number.isFinite));
+  }
+
+  function findUnitNearChart(rows, rowIndex, colIndex) {
+    const start = Math.max(0, rowIndex - 12);
+    const end = Math.min(rows.length - 1, rowIndex + 5);
+    for (let r = end; r >= start; r -= 1) {
+      const row = rows[r] || [];
+      const from = Math.max(0, colIndex - 8);
+      const to = Math.min(row.length, colIndex + 30);
+      const line = row.slice(from, to).filter(v => v != null && v !== '').join(' ');
+      const match = line.match(/U\s*-\s*\d{4}/i);
+      if (match) return match[0].replace(/\s/g, '').toUpperCase();
+      if (/IMPLANTA[ÇC][AÃ]O/i.test(line)) return 'IMPLANTAÇÃO';
+    }
+    return '';
+  }
+
+  async function extractCurvesCharts(buffer, workbook) {
+    if (!workbook.SheetNames.includes(cfg.sheets.curves) || typeof JSZip === 'undefined') return [];
+    try {
+      const zip = await JSZip.loadAsync(buffer);
+      const wbFile = zip.file('xl/workbook.xml');
+      if (!wbFile) return [];
+      const wbDoc = xmlDocument(await wbFile.async('text'));
+      const sheet = localElements(wbDoc, 'sheet').find(el => normalizeHeader(el.getAttribute('name')) === normalizeHeader(cfg.sheets.curves));
+      if (!sheet) return [];
+      const rid = sheet.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id') || sheet.getAttribute('r:id');
+      const sheetPath = await relationshipTarget(zip, 'xl/workbook.xml', rid);
+      if (!sheetPath || !zip.file(sheetPath)) return [];
+      const sheetDoc = xmlDocument(await zip.file(sheetPath).async('text'));
+      const drawingEl = localElements(sheetDoc, 'drawing')[0];
+      if (!drawingEl) return [];
+      const drawingRid = drawingEl.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id') || drawingEl.getAttribute('r:id');
+      const drawingPath = await relationshipTarget(zip, sheetPath, drawingRid);
+      if (!drawingPath || !zip.file(drawingPath)) return [];
+      const drawingDoc = xmlDocument(await zip.file(drawingPath).async('text'));
+      const curveRows = XLSX.utils.sheet_to_json(workbook.Sheets[cfg.sheets.curves], { header: 1, raw: true, defval: null });
+      const anchors = [...localElements(drawingDoc, 'twoCellAnchor'), ...localElements(drawingDoc, 'oneCellAnchor')];
+      const output = [];
+
+      for (const anchor of anchors) {
+        const chartEl = localElements(anchor, 'chart')[0];
+        if (!chartEl) continue;
+        const chartRid = chartEl.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id') || chartEl.getAttribute('r:id');
+        const chartPath = await relationshipTarget(zip, drawingPath, chartRid);
+        if (!chartPath || !zip.file(chartPath)) continue;
+        const chartDoc = xmlDocument(await zip.file(chartPath).async('text'));
+        const series = chartSeries(chartDoc, workbook);
+        if (!series.length) continue;
+        const from = localElements(anchor, 'from')[0];
+        const rowIndex = Number(nodeText(from, 'row') || 0);
+        const colIndex = Number(nodeText(from, 'col') || 0);
+        const unitCode = findUnitNearChart(curveRows, rowIndex, colIndex);
+        const title = localElements(chartDoc, 'title').map(el => localElements(el, 't').map(t => t.textContent).join(' ')).join(' ').trim();
+        output.push({
+          unitCode,
+          title: title || 'Curva de execução financeira',
+          rowIndex,
+          colIndex,
+          series
+        });
+      }
+      return output;
+    } catch (error) {
+      console.warn('Não foi possível interpretar os gráficos da aba CURVAS:', error);
+      return [];
+    }
+  }
+
   async function readWorkbook(file) {
     validateExtension(file);
-    let workbook;
+    let workbook, buffer;
     try {
-      const buffer = await file.arrayBuffer();
+      buffer = await file.arrayBuffer();
       workbook = XLSX.read(buffer, { type: 'array', cellDates: false, cellFormula: false });
     } catch (error) {
       throw new Error('Não foi possível ler o Excel. Confirme se o arquivo não está corrompido e tente novamente.');
@@ -66,7 +239,8 @@
     const summary = workbook.SheetNames.includes(cfg.sheets.summary)
       ? XLSX.utils.sheet_to_json(workbook.Sheets[cfg.sheets.summary], { header: 1, raw: true, defval: null })
       : null;
-    return { workbook, primary, summary, headerRow };
+    const curvesCharts = await extractCurvesCharts(buffer, workbook);
+    return { workbook, primary, summary, curvesCharts, headerRow };
   }
 
   window.ExcelReader = { readWorkbook };
