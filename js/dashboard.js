@@ -25,6 +25,7 @@
     renderUnitNavigation();
     renderExecutive();
     renderAnalyses();
+    if (window.PBDashboard) window.PBDashboard.init(model, fileName);
   }
 
   function renderUnitNavigation() {
@@ -81,7 +82,8 @@
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
     document.getElementById(`page-${page}`).classList.add('active');
     document.querySelector(`[data-page="${page}"]`)?.classList.add('active');
-    document.getElementById('page-title').textContent = page === 'executive' ? 'Visão Executiva' : page === 'analysis' ? 'Análises' : currentUnit?.rawName || 'Unidade';
+    document.getElementById('page-title').textContent = page === 'executive' ? 'Visão Executiva' : page === 'pb' ? 'Visão PB (Petrobras)' : page === 'analysis' ? 'Análises' : currentUnit?.rawName || 'Unidade';
+    if (page === 'pb' && window.PBDashboard) window.PBDashboard.render();
   }
 
   function unitScope(unit) {
