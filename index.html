@@ -32,7 +32,7 @@
           <h2>BI Rundown</h2>
           <p>Produção semanal, saldo restante, curvas Previsto/Realizado/Projetado e Rundown por atividade.</p>
           <div class="bi-choice-actions">
-            <a class="file-button" href="https://rhianmello.github.io/bi-epc15/rundown.html" target="_self">Abrir BI Rundown</a>
+            <a class="file-button" id="open-rundown-dashboard" href="https://rhianmello.github.io/bi-epc15/rundown.html" target="_self">Abrir BI Rundown</a>
           </div>
         </article>
       </div>
@@ -150,6 +150,24 @@
       <button id="close-presentation">Fechar</button>
     </div>
   </section>
+
+
+  <div id="login-gate" class="login-gate hidden" role="dialog" aria-modal="true" aria-labelledby="login-title">
+    <form id="login-form" class="login-card">
+      <div class="login-badge">ACESSO RESTRITO</div>
+      <h2 id="login-title">Entrar no BI</h2>
+      <p>Informe usuário e senha para acessar o painel.</p>
+      <label for="login-user">Usuário</label>
+      <input id="login-user" name="username" type="text" autocomplete="username" placeholder="Admin" required>
+      <label for="login-pass">Senha</label>
+      <input id="login-pass" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required>
+      <div id="login-error" class="login-error hidden">Usuário ou senha incorretos.</div>
+      <div class="login-actions">
+        <button type="button" id="login-cancel" class="login-secondary">Cancelar</button>
+        <button type="submit" class="login-primary">Entrar</button>
+      </div>
+    </form>
+  </div>
 
   <script src="vendor/xlsx.full.min.js"></script>
   <script src="vendor/chart.umd.min.js"></script>
