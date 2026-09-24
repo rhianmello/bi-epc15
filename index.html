@@ -127,7 +127,8 @@
         </div>
 
         <div class="pb-layout">
-          <article class="pb-card pb-physical-card">
+          <div class="pb-column pb-column-left">
+<article class="pb-card pb-physical-card">
             <header class="pb-card-head">
               <div><h3>AVANÇO FÍSICO GLOBAL &amp; ANÁLISE DE DESVIOS</h3></div>
               <div class="pb-context"><span id="pb-wbs">WBS Nível 0</span><b id="pb-context-date">Data Base: N/D</b></div>
@@ -158,16 +159,7 @@
               </div>
             </div>
           </article>
-
-          <article class="pb-card pb-offenders-card">
-            <header class="pb-card-head">
-              <div class="pb-title-inline"><h3>Frentes Ofensoras no Caminho Crítico (CPM)</h3><span id="pb-offender-count" class="pb-count-red">0 Ofensores</span></div>
-              <div class="pb-right-note"><b>FOCO DE DECISÃO EXECUTIVA</b><small id="pb-cpm-note">CPM N/D</small></div>
-            </header>
-            <div id="pb-offenders-list" class="pb-offenders-list"></div>
-          </article>
-
-          <article class="pb-card pb-lookahead-card">
+<article class="pb-card pb-lookahead-card">
             <header class="pb-card-head">
               <div class="pb-title-inline"><h3>Principais Atividades (Lookahead Semanal)</h3><span id="pb-lookahead-count" class="pb-count-green">0 frentes</span></div>
               <span class="pb-focus-week">FOCO SEMANAL</span>
@@ -178,14 +170,24 @@
             </div>
             <div id="pb-lookahead-list" class="pb-lookahead-list"></div>
           </article>
+          </div>
 
-          <article class="pb-card pb-metrics-card">
+          <div class="pb-column pb-column-right">
+<article class="pb-card pb-offenders-card">
+            <header class="pb-card-head">
+              <div class="pb-title-inline"><h3>Frentes Ofensoras — Desvios Críticos</h3><span id="pb-offender-count" class="pb-count-red">0 Ofensores</span></div>
+              <div class="pb-right-note"><b>FOCO DE DECISÃO EXECUTIVA</b><small id="pb-cpm-note">CPM não disponível na planilha</small></div>
+            </header>
+            <div id="pb-offenders-list" class="pb-offenders-list"></div>
+          </article>
+<article class="pb-card pb-metrics-card">
             <header class="pb-card-head">
               <div class="pb-title-inline"><h3>MÉTRICAS DE CAMPO: PREVISTO VS. REALIZADO</h3><span id="pb-metric-count" class="pb-muted-chip">0 métricas-chave</span></div>
               <span class="pb-focus-week">ACOMPANHAMENTO SEMANAL BI</span>
             </header>
             <div id="pb-metrics-grid" class="pb-metrics-grid"></div>
           </article>
+          </div>
         </div>
 
         <div id="pb-activity-modal" class="pb-modal hidden">
