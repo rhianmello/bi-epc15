@@ -104,6 +104,7 @@
     if (event.target.closest('[data-action="presentation"]') && hasData) Presentation.open();
   });
   document.getElementById('sort-units').addEventListener('click', () => { if (hasData) Dashboard.toggleSort(); });
+  document.getElementById('unit-phase-filter')?.addEventListener('change', event => Dashboard.setPhaseFilter(event.target.value));
   document.getElementById('unit-filters').addEventListener('input', Dashboard.renderDetails);
   document.getElementById('unit-filters').addEventListener('change', Dashboard.renderDetails);
   document.getElementById('prev-slide').addEventListener('click', Presentation.previous);
