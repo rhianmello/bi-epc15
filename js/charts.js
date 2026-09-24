@@ -50,5 +50,53 @@
     };
   }
 
-  window.DashboardCharts = { unitProgress, phaseProgress, variance };
+  function financialCurve(curve) {
+    if (registry.unitCurve) { registry.unitCurve.destroy(); delete registry.unitCurve; }
+    if (!curve?.series?.length) return false;
+    const canvas = document.getElementById('unit-curve-chart');
+    if (!canvas) return false;
+
+    const palette = ['#60a5fa','#f59e0b','#0f172a','#22c55e','#8b5cf6','#ef4444'];
+    let labels = curve.series.find(s => s.categories?.length)?.categories || [];
+    const maxLen = Math.max(...curve.series.map(s => s.values?.length || 0), labels.length);
+    if (!labels.length) labels = Array.from({length:maxLen}, (_,i) => String(i+1));
+
+    const allValues = curve.series.flatMap(s => s.values || []).filter(Number.isFinite);
+    const asPercent = allValues.length && Math.max(...allValues.map(v => Math.abs(v))) <= 1.5;
+    const datasets = curve.series.map((s,i) => ({
+      label: s.name,
+      data: (s.values || []).map(v => Number.isFinite(v) ? (asPercent ? v * 100 : v) : null),
+      borderColor: palette[i % palette.length],
+      backgroundColor: palette[i % palette.length],
+      borderWidth: i === 2 ? 2.2 : 1.6,
+      borderDash: /BL|BASE|PLANO/i.test(s.name) ? [5,4] : [],
+      pointRadius: 0,
+      pointHoverRadius: 3,
+      tension: .12,
+      spanGaps: true
+    }));
+
+    registry.unitCurve = new Chart(canvas, {
+      type:'line',
+      data:{labels,datasets},
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        interaction:{mode:'index',intersect:false},
+        plugins:{
+          legend:{position:'top',align:'start',labels:{color:'#334155',usePointStyle:true,boxWidth:7,font:{size:10}}},
+          tooltip:{callbacks:{label:ctx => {
+            const v=ctx.parsed.y;
+            return Number.isFinite(v) ? ctx.dataset.label + ': ' + v.toLocaleString('pt-BR',{maximumFractionDigits:2}) + (asPercent?'%':'') : ctx.dataset.label + ': —';
+          }}}
+        },
+        scales:{
+          x:{grid:{color:'rgba(15,23,42,.08)'},ticks:{color:'#64748b',maxRotation:90,minRotation:0,autoSkip:true,maxTicksLimit:16,font:{size:9}}},
+          y:{beginAtZero:true,suggestedMax:asPercent?100:undefined,grid:{color:'rgba(15,23,42,.10)'},ticks:{color:'#64748b',callback:v=>asPercent?v+'%':v}}
+        }
+      }
+    });
+    return true;
+  }
+
+  window.DashboardCharts = { unitProgress, phaseProgress, variance, financialCurve };
 }());
