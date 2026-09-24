@@ -264,8 +264,9 @@
     });
     const notes = offenderNotes();
     document.getElementById('pb-offender-count').textContent = unique.length + ' Ofensores';
-    document.getElementById('pb-cpm-note').textContent = 'classificação por desvio • CPM N/D';
+    document.getElementById('pb-cpm-note').textContent = 'CPM não disponível • ordenado por impacto do desvio';
     const host = document.getElementById('pb-offenders-list');
+    host.scrollTop = 0;
     if (!unique.length) {
       host.innerHTML = '<div class="pb-empty-light">Nenhum item com desvio negativo para esta seleção.</div>';
       return;
@@ -287,6 +288,7 @@
         '</div>' +
       '</article>';
     }).join('');
+    host.scrollTop = 0;
   }
 
   function metricCandidates() {
