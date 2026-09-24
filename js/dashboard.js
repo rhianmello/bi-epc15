@@ -1,6 +1,7 @@
 (function () {
   let model;
   let currentUnit;
+  let currentPhase = '';
   let unitSortAscending = true;
   const pt = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 });
   const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -83,31 +84,110 @@
     document.getElementById('page-title').textContent = page === 'executive' ? 'Visão Executiva' : page === 'analysis' ? 'Análises' : currentUnit?.rawName || 'Unidade';
   }
 
-  function renderUnit(index) {
-    currentUnit = model.units[index];
+  function unitScope(unit) {
+    if (!currentPhase) return unit;
+    return unit.phases.find(p => p.phase === currentPhase) || unit;
+  }
+
+  function buildPhaseSelector(unit) {
+    const select = document.getElementById('unit-phase-filter');
+    if (!select) return;
+    const phases = [...new Set(unit.phases.map(p => p.phase).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    select.innerHTML = '<option value="">Todas as fases</option>' + phases.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+    select.value = currentPhase;
+  }
+
+  function rowLabel(row) {
+    return row.criterion || row.step || row.component || row.grouping || row.subphase || row.phase || 'Item sem identificação';
+  }
+
+  function renderDelayedItems(unit) {
+    const rows = unit.details
+      .filter(row => !currentPhase || row.phase === currentPhase)
+      .filter(row => Number.isFinite(row.variance) && row.variance < 0)
+      .sort((a,b) => a.variance - b.variance);
+
+    const unique = [];
+    const seen = new Set();
+    for (const row of rows) {
+      const label = rowLabel(row);
+      const key = [row.phase,row.subphase,row.grouping,row.component,row.step,row.criterion].join('|');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push({ ...row, displayLabel: label });
+      if (unique.length >= 7) break;
+    }
+
+    const count = document.getElementById('delay-count');
+    const list = document.getElementById('delay-list');
+    if (count) count.textContent = `${integer.format(rows.length)} em atraso`;
+    if (!list) return;
+    if (!unique.length) {
+      list.innerHTML = '<div class="delay-empty">Nenhum item com desvio negativo para esta seleção.</div>';
+      return;
+    }
+    list.innerHTML = unique.map((row,index) => {
+      const context = [row.subphase,row.grouping,row.component,row.step].filter(Boolean).filter(v => v !== row.displayLabel).slice(-2).join(' • ');
+      return `<div class="delay-item">
+        <span class="delay-rank">${String(index+1).padStart(2,'0')}</span>
+        <div class="delay-copy"><strong>${escapeHtml(row.displayLabel)}</strong><span>${escapeHtml(context || row.phase || '')}</span></div>
+        <div class="delay-metrics"><b>${pp(row.variance)}</b><small>${percent(row.actual)} / ${percent(row.planned)}</small></div>
+      </div>`;
+    }).join('');
+  }
+
+  function renderUnitSummary() {
+    if (!currentUnit) return;
     const u = currentUnit;
+    const scope = unitScope(u);
+    const phaseRows = currentPhase ? u.phases.filter(p => p.phase === currentPhase) : u.phases;
+
     document.getElementById('unit-kpis').innerHTML = [
-      kpi('Previsto', percent(u.planned), 'Avanço físico', '#60a5fa'), kpi('Realizado', percent(u.actual), 'Avanço físico', '#22d3ee'),
-      kpi('Desvio', pp(u.variance), 'Pontos percentuais', u.variance >= 0 ? '#22c55e' : '#ef4444'),
-      kpi('Valor previsto', currency(u.plannedValue), 'Escopo da unidade', '#8b5cf6'), kpi('Valor realizado', currency(u.actualValue), 'Acumulado', '#14b8a6')
+      kpi('Previsto', percent(scope.planned), currentPhase ? currentPhase : 'Avanço físico da unidade', '#60a5fa'),
+      kpi('Realizado', percent(scope.actual), currentPhase ? currentPhase : 'Avanço físico da unidade', '#22d3ee'),
+      kpi('Desvio', pp(scope.variance), 'Previsto x realizado', scope.variance >= 0 ? '#22c55e' : '#ef4444'),
+      kpi('Valor previsto', currency(scope.plannedValue), currentPhase ? 'Escopo da fase' : 'Escopo da unidade', '#8b5cf6'),
+      kpi('Valor realizado', currency(scope.actualValue), 'Acumulado', '#14b8a6')
     ].join('');
-    document.getElementById('phase-table').innerHTML = u.phases.map(p => {
+
+    document.getElementById('phase-table').innerHTML = phaseRows.map(p => {
       const s = DataModel.statusFor(p.variance);
       return `<tr><td>${escapeHtml(p.phase)}</td><td class="numeric">${percent(p.planned)}</td><td class="numeric">${percent(p.actual)}</td><td class="numeric">${pp(p.variance)}</td><td>${status({status:s})}</td></tr>`;
-    }).join('');
-    DashboardCharts.phaseProgress(u.phases);
+    }).join('') || '<tr><td colspan="5" class="muted">Sem fases disponíveis.</td></tr>';
+
+    DashboardCharts.phaseProgress(phaseRows);
+    renderDelayedItems(u);
+
+    const curveOk = DashboardCharts.financialCurve(u.curve);
+    const empty = document.getElementById('unit-curve-empty');
+    if (empty) empty.classList.toggle('hidden', curveOk);
+
     buildFilters(u);
     renderDetails();
+  }
+
+  function renderUnit(index) {
+    currentUnit = model.units[index];
+    currentPhase = '';
+    buildPhaseSelector(currentUnit);
+    renderUnitSummary();
     showPage('unit');
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
     document.querySelector(`[data-unit-index="${index}"]`)?.classList.add('active');
-    document.getElementById('page-title').textContent = u.rawName;
+    document.getElementById('page-title').textContent = currentUnit.rawName;
+  }
+
+  function setPhaseFilter(value) {
+    currentPhase = value || '';
+    const select = document.getElementById('unit-phase-filter');
+    if (select && select.value !== currentPhase) select.value = currentPhase;
+    renderUnitSummary();
   }
 
   function buildFilters(unit) {
-    const fields = [['phase','Fase'],['subphase','Subfase'],['grouping','Agrupamento'],['component','Componente'],['step','Etapa']];
+    const fields = [['subphase','Subfase'],['grouping','Agrupamento'],['component','Componente'],['step','Etapa']];
     document.getElementById('unit-filters').innerHTML = `<input id="detail-search" type="search" placeholder="Pesquisar no detalhamento...">` + fields.map(([key,label]) => {
-      const values = [...new Set(unit.details.map(r => r[key]).filter(Boolean))].sort((a,b) => a.localeCompare(b,'pt-BR'));
+      const values = [...new Set(unit.details.filter(r => !currentPhase || r.phase === currentPhase).map(r => r[key]).filter(Boolean))].sort((a,b) => a.localeCompare(b,'pt-BR'));
       return `<select data-filter="${key}"><option value="">${label}: todos</option>${values.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('')}</select>`;
     }).join('');
   }
@@ -117,6 +197,7 @@
     const query = (document.getElementById('detail-search')?.value || '').trim().toLocaleLowerCase('pt-BR');
     const selections = Object.fromEntries([...document.querySelectorAll('#unit-filters select')].map(el => [el.dataset.filter, el.value]));
     const rows = currentUnit.details.filter(row => {
+      if (currentPhase && row.phase !== currentPhase) return false;
       const selected = Object.entries(selections).every(([key,value]) => !value || row[key] === value);
       const haystack = [row.phase,row.subphase,row.grouping,row.component,row.step,row.criterion].join(' ').toLocaleLowerCase('pt-BR');
       return selected && (!query || haystack.includes(query));
@@ -136,5 +217,5 @@
 
   function toggleSort() { unitSortAscending = !unitSortAscending; renderUnitsTable(); }
 
-  window.Dashboard = { init, showPage, renderUnit, renderDetails, toggleSort, format: { percent, pp, currency, quantity, date, escapeHtml }, getModel: () => model };
+  window.Dashboard = { init, showPage, renderUnit, setPhaseFilter, renderDetails, toggleSort, format: { percent, pp, currency, quantity, date, escapeHtml }, getModel: () => model };
 }());
