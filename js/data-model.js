@@ -55,6 +55,24 @@
     });
   }
 
+  function normalizedUnitKey(value) {
+    const raw = text(value).toUpperCase();
+    const match = raw.match(/U\s*-?\s*(\d{4})/);
+    if (match) return 'U-' + match[1];
+    return /IMPLANTA/.test(raw) ? 'IMPLANTAÇÃO' : raw.replace(/\s+/g, ' ');
+  }
+
+  function curveForUnit(charts, code, rawName) {
+    if (!Array.isArray(charts) || !charts.length) return null;
+    const keys = [normalizedUnitKey(code), normalizedUnitKey(rawName)].filter(Boolean);
+    const exact = charts.find(chart => keys.includes(normalizedUnitKey(chart.unitCode)));
+    if (exact) return exact;
+    return charts.find(chart => {
+      const haystack = normalizedUnitKey(chart.title);
+      return keys.some(key => key && haystack.includes(key));
+    }) || null;
+  }
+
   function buildDataModel(parsed) {
     const normalized = parsed.primary.slice(parsed.headerRow + 1).map((row, i) => normalizeRow(row, parsed.headerRow + 1 + i));
     const contractIndexes = [];
@@ -76,7 +94,8 @@
       const phases = segment.filter(row => row.level === 2);
       const leaves = leafRows(segment.filter(row => row.level >= 2));
       const identity = displayUnit(summary.unit);
-      return { ...summary, ...identity, rawName: summary.unit, phases, details: leaves, status: statusFor(summary.variance) };
+      const curve = curveForUnit(parsed.curvesCharts, identity.code, summary.unit);
+      return { ...summary, ...identity, rawName: summary.unit, phases, details: leaves, curve, status: statusFor(summary.variance) };
     });
 
     let dateValue = findSummaryValue(parsed.summary, 'DATA-BASE');
@@ -90,7 +109,8 @@
         sheetNames: parsed.workbook.SheetNames,
         primaryBlockRows: primaryBlock.length,
         ignoredSecondaryBlocks: Math.max(0, contractIndexes.length - 1),
-        summaryAvailable: Boolean(parsed.summary)
+        summaryAvailable: Boolean(parsed.summary),
+        curvesAvailable: Boolean(parsed.curvesCharts?.length)
       }
     };
   }
