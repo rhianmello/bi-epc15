@@ -54,11 +54,12 @@
       <div class="sidebar-brand"><span>BI</span> EPC-15</div>
       <nav class="main-nav" aria-label="Navegação principal">
         <button class="nav-item active" data-page="executive"><span>01</span> Visão Executiva</button>
+        <button class="nav-item" data-page="pb"><span>02</span> Visão PB</button>
         <div class="nav-group-label">UNIDADES</div>
         <div id="unit-nav"></div>
-        <button class="nav-item" data-page="analysis"><span>02</span> Análises</button>
-        <button class="nav-item" data-action="presentation"><span>03</span> Modo Apresentação</button>
-        <a class="nav-item" href="rundown.html" style="text-decoration:none"><span>04</span> BI Rundown</a>
+        <button class="nav-item" data-page="analysis"><span>03</span> Análises</button>
+        <button class="nav-item" data-action="presentation"><span>04</span> Modo Apresentação</button>
+        <a class="nav-item" href="rundown.html" style="text-decoration:none"><span>05</span> BI Rundown</a>
       </nav>
       <div class="sidebar-footer">
         <button id="change-file" class="text-button">Trocar arquivo</button>
@@ -109,6 +110,105 @@
         <div class="grid-2">
           <article class="panel"><div class="panel-heading"><div><p class="eyebrow">ATENÇÃO</p><h3>Maiores desvios</h3></div></div><div id="worst-ranking" class="ranking-list"></div></article>
           <article class="panel"><div class="panel-heading"><div><p class="eyebrow">DESTAQUE</p><h3>Melhores avanços</h3></div></div><div id="best-ranking" class="ranking-list"></div></article>
+        </div>
+      </section>
+
+
+      <section id="page-pb" class="page pb-page">
+        <div class="pb-filterbar">
+          <div class="pb-filter-title">
+            <span class="pb-petrobras-pill">PETROBRAS</span>
+            <div><strong>VISÃO PB</strong><small id="pb-file-info"></small></div>
+          </div>
+          <label>UNIDADE<select id="pb-unit-filter"><option value="">Todas as Unidades</option></select></label>
+          <label>FASE<select id="pb-phase-filter"><option value="">Todas as Fases</option></select></label>
+          <label>DATA BASE<select id="pb-date-filter"><option>N/D</option></select></label>
+          <label>SEMANA<select id="pb-week-filter"><option>Semana N/D</option></select></label>
+        </div>
+
+        <div class="pb-layout">
+          <article class="pb-card pb-physical-card">
+            <header class="pb-card-head">
+              <div><h3>AVANÇO FÍSICO GLOBAL &amp; ANÁLISE DE DESVIOS</h3></div>
+              <div class="pb-context"><span id="pb-wbs">WBS Nível 0</span><b id="pb-context-date">Data Base: N/D</b></div>
+            </header>
+            <div class="pb-physical-grid">
+              <div class="pb-progress-stack">
+                <div class="pb-progress-box pb-planned-box">
+                  <div><small>1. FÍSICO PREVISTO</small><strong id="pb-planned">N/D</strong></div>
+                  <div class="pb-week-chip"><span>META SEM.</span><b id="pb-planned-week">N/D</b></div>
+                </div>
+                <div class="pb-progress-box pb-actual-box">
+                  <div><small>2. FÍSICO REALIZADO</small><strong id="pb-actual">N/D</strong></div>
+                  <div class="pb-week-chip"><span>PROD. SEM.</span><b id="pb-actual-week">N/D</b></div>
+                </div>
+                <div class="pb-gap-box">
+                  <strong>⚖ GAP Consolidado</strong>
+                  <span id="pb-gap" class="pb-gap-value">N/D</span>
+                  <small id="pb-gap-days">impacto temporal N/D</small>
+                </div>
+              </div>
+              <div class="pb-pareto">
+                <div class="pb-subhead"><strong>Pareto de Ofensores (80/20)</strong><span id="pb-pareto-marker">Sem desvios</span></div>
+                <div class="pb-pareto-chart-wrap">
+                  <canvas id="pb-pareto-chart"></canvas>
+                  <div id="pb-pareto-empty" class="pb-chart-empty hidden">Sem desvios comparáveis para esta seleção.</div>
+                </div>
+                <div class="pb-pareto-legend"><span>■ % Desvio individual</span><span>— Curva Acum. (80%)</span></div>
+              </div>
+            </div>
+          </article>
+
+          <article class="pb-card pb-offenders-card">
+            <header class="pb-card-head">
+              <div class="pb-title-inline"><h3>Frentes Ofensoras no Caminho Crítico (CPM)</h3><span id="pb-offender-count" class="pb-count-red">0 Ofensores</span></div>
+              <div class="pb-right-note"><b>FOCO DE DECISÃO EXECUTIVA</b><small id="pb-cpm-note">CPM N/D</small></div>
+            </header>
+            <div id="pb-offenders-list" class="pb-offenders-list"></div>
+          </article>
+
+          <article class="pb-card pb-lookahead-card">
+            <header class="pb-card-head">
+              <div class="pb-title-inline"><h3>Principais Atividades (Lookahead Semanal)</h3><span id="pb-lookahead-count" class="pb-count-green">0 frentes</span></div>
+              <span class="pb-focus-week">FOCO SEMANAL</span>
+            </header>
+            <div class="pb-quick-add">
+              <input id="pb-activity-quick" type="text" placeholder="Digitar atividade da semana...">
+              <button id="pb-activity-add" type="button">+ Adicionar</button>
+            </div>
+            <div id="pb-lookahead-list" class="pb-lookahead-list"></div>
+          </article>
+
+          <article class="pb-card pb-metrics-card">
+            <header class="pb-card-head">
+              <div class="pb-title-inline"><h3>MÉTRICAS DE CAMPO: PREVISTO VS. REALIZADO</h3><span id="pb-metric-count" class="pb-muted-chip">0 métricas-chave</span></div>
+              <span class="pb-focus-week">ACOMPANHAMENTO SEMANAL BI</span>
+            </header>
+            <div id="pb-metrics-grid" class="pb-metrics-grid"></div>
+          </article>
+        </div>
+
+        <div id="pb-activity-modal" class="pb-modal hidden">
+          <div class="pb-modal-card">
+            <div class="pb-modal-head"><h3>Editar atividade semanal</h3><button id="pb-activity-modal-cancel" type="button">×</button></div>
+            <label>Título<input id="pb-activity-title" type="text"></label>
+            <label>Descrição<textarea id="pb-activity-desc" rows="3"></textarea></label>
+            <div class="pb-modal-row">
+              <label>Status<select id="pb-activity-status">
+                <option value="planejado">Planejado</option>
+                <option value="andamento">Em Andamento</option>
+                <option value="atencao">Atenção</option>
+                <option value="critico">Crítico</option>
+                <option value="concluido">Concluído</option>
+                <option value="meta">Meta %</option>
+              </select></label>
+              <label>Percentual<input id="pb-activity-percent" type="number" min="0" max="100" step="1" placeholder="88"></label>
+            </div>
+            <div class="pb-modal-actions">
+              <button id="pb-activity-modal-delete" class="pb-btn-danger" type="button">Excluir</button>
+              <button id="pb-activity-modal-save" class="pb-btn-primary" type="button">Salvar</button>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -217,6 +317,7 @@
   <script src="js/data-model.js"></script>
   <script src="js/charts.js"></script>
   <script src="js/dashboard.js"></script>
+  <script src="js/pb-dashboard.js"></script>
   <script src="js/presentation.js"></script>
   <script src="js/export.js"></script>
   <script src="js/app.js"></script>
