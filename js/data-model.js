@@ -98,7 +98,71 @@
     return map;
   }
 
-  function financialCurveForUnit(sources, code, rawName, dataBase, fallbackActualValue) {
+
+  function directBlockSeries(block, key, serials) {
+    const source = block?.series?.[key] || [];
+    const dates = block?.dates || [];
+    const map = new Map();
+    dates.forEach((serial,i) => {
+      const value = source[i];
+      map.set(Number(serial), Number.isFinite(value) ? value : null);
+    });
+    return serials.map(serial => map.has(serial) ? map.get(serial) : null);
+  }
+
+  function lastFinitePoint(values, serials) {
+    for (let i = values.length - 1; i >= 0; i -= 1) {
+      if (Number.isFinite(values[i])) return { index:i, serial:serials[i], value:values[i] };
+    }
+    return null;
+  }
+
+  function firstFinitePoint(values, serials) {
+    for (let i = 0; i < values.length; i += 1) {
+      if (Number.isFinite(values[i])) return { index:i, serial:serials[i], value:values[i] };
+    }
+    return null;
+  }
+
+  function financialCurveFromBLPlanAtaq(block, fallbackSummary) {
+    if (!block?.dates?.length) return null;
+    const serials = [...new Set(block.dates.map(Number).filter(Number.isFinite))].sort((a,b)=>a-b);
+    if (!serials.length) return null;
+
+    const planAttack = directBlockSeries(block,'planAttackPct',serials);
+    const contractual = directBlockSeries(block,'contractualPct',serials);
+    const real = directBlockSeries(block,'realPct',serials);
+    const projected = directBlockSeries(block,'projectedPct',serials);
+
+    // O arquivo guarda o primeiro ponto do Projetado no dia seguinte ao último Real,
+    // com exatamente o mesmo percentual. Repetimos esse valor no último dia Real
+    // para a linha amarela nascer visualmente do fim da linha verde, sem salto.
+    const realEnd = lastFinitePoint(real,serials);
+    const projectedStart = firstFinitePoint(projected,serials);
+    if (realEnd && projectedStart && projectedStart.index === realEnd.index + 1 &&
+        Math.abs(projectedStart.value - realEnd.value) < 1e-8) {
+      projected[realEnd.index] = realEnd.value;
+    }
+
+    return {
+      source:'blplanataq-direct',
+      unitCode:block.key,
+      title:block.name,
+      serials,
+      labels:serials.map(dateLabel),
+      series:[
+        {key:'planAttack',name:'Plan.Ataq - % Acum',values:planAttack},
+        {key:'contractual',name:'BLcontratual - % Acum',values:contractual},
+        {key:'real',name:'Real - % Acum',values:real},
+        {key:'projected',name:'Projetado - % Acum',values:projected}
+      ],
+      summary:fallbackSummary || null,
+      sourceRows:block.sourceRows || {},
+      sourceRange:{firstRow:block.firstRow,lastRow:block.lastRow}
+    };
+  }
+
+  function financialCurveFromSources(sources, code, rawName, dataBase, fallbackActualValue) {
     if (!sources) return null;
     const contractual = sources.contractual?.units?.[code] || null;
     const planAttack = sources.planAttack?.units?.[code] || null;
@@ -177,6 +241,14 @@
     };
   }
 
+
+  function financialCurveForUnit(blocks, sources, code, rawName, dataBase, fallbackActualValue) {
+    const fallback = financialCurveFromSources(sources, code, rawName, dataBase, fallbackActualValue);
+    const block = blocks?.blocks?.[code] || null;
+    if (block) return financialCurveFromBLPlanAtaq(block, fallback?.summary || null);
+    return fallback;
+  }
+
   function buildDataModel(parsed) {
     const normalized = parsed.primary.slice(parsed.headerRow + 1).map((row, i) => normalizeRow(row, parsed.headerRow + 1 + i));
     const contractIndexes = [];
@@ -202,14 +274,18 @@
       const phases = segment.filter(row => row.level === 2);
       const leaves = leafRows(segment.filter(row => row.level >= 2));
       const identity = displayUnit(summary.unit);
-      const rawFinancialCurve = financialCurveForUnit(parsed.financialSources, identity.code, summary.unit, dataBase, summary.actualValue);
+      const rawFinancialCurve = financialCurveForUnit(parsed.blPlanAtaqCurves, parsed.financialSources, identity.code, summary.unit, dataBase, summary.actualValue);
       const legacyCurve = curveForUnit(parsed.curvesCharts, identity.code, summary.unit);
       const curve = rawFinancialCurve || legacyCurve;
       return { ...summary, ...identity, rawName: summary.unit, phases, details: leaves, curve, status: statusFor(summary.variance) };
     });
 
     return {
-      contract: { ...contract, status: statusFor(contract.variance) },
+      contract: {
+        ...contract,
+        curve: financialCurveFromBLPlanAtaq(parsed.blPlanAtaqCurves?.blocks?.EMPREENDIMENTO || null, null),
+        status: statusFor(contract.variance)
+      },
       units,
       dataBase,
       metadata: {
@@ -218,7 +294,8 @@
         ignoredSecondaryBlocks: Math.max(0, contractIndexes.length - 1),
         summaryAvailable: Boolean(parsed.summary),
         curvesAvailable: Boolean(parsed.curvesCharts?.length),
-        financialSourcesAvailable: Boolean(parsed.financialSources?.planAttack || parsed.financialSources?.contractual)
+        financialSourcesAvailable: Boolean(parsed.financialSources?.planAttack || parsed.financialSources?.contractual),
+        blPlanAtaqCurveBlocks: parsed.blPlanAtaqCurves?.audit || null
       }
     };
   }
