@@ -295,6 +295,7 @@
         summaryAvailable: Boolean(parsed.summary),
         curvesAvailable: Boolean(parsed.curvesCharts?.length),
         financialSourcesAvailable: Boolean(parsed.financialSources?.planAttack || parsed.financialSources?.contractual),
+        blPlanAtaqBlocks: Object.keys(parsed.blPlanAtaqBlocks || {}),
         blPlanAtaqCurveBlocks: parsed.blPlanAtaqCurves?.audit || null
       }
     };
