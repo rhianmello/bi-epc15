@@ -6,6 +6,40 @@
   <meta name="theme-color" content="#07111f">
   <title>BI EPC-15</title>
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* Ajustes CPL / Reunião de Coordenação */
+    .nav-item[data-page="executive"]::after,.nav-item[data-page="pb"]::after{content:""}
+    .cpl-ppt-button{padding:11px 16px;border:1px solid rgba(34,211,238,.32);border-radius:10px;background:rgba(14,165,233,.13);color:#9de8f4;font-weight:800;cursor:pointer;white-space:nowrap}
+    .cpl-ppt-button:hover{background:rgba(14,165,233,.22);color:#fff}
+    .pb-page{margin:0!important;padding:0!important;background:transparent!important;color:inherit!important;font-family:inherit!important}
+    .pb-filterbar,.pb-card{background:#0e1f34!important;border:1px solid rgba(148,163,184,.16)!important;box-shadow:none!important;color:#e8f2fc!important}
+    .pb-filterbar{margin-bottom:16px!important;padding:16px!important;border-radius:16px!important}
+    .pb-filterbar label,.pb-filter-title small,.pb-right-note small,.pb-focus-week{color:#7d95b0!important}
+    .pb-filter-title strong,.pb-card-head h3,.pb-subhead strong{color:#e8f2fc!important}
+    .pb-petrobras-pill{background:linear-gradient(135deg,#16d4ff,#1e72ff)!important;box-shadow:none!important;color:#06101d!important;border:0!important;letter-spacing:.12em}
+    .pb-filterbar select,.pb-quick-add input,.pb-offender-body textarea,.pb-modal-card input,.pb-modal-card textarea,.pb-modal-card select{background:#071321!important;border-color:rgba(148,163,184,.22)!important;color:#e8f2fc!important}
+    .pb-progress-box,.pb-gap-box,.pb-pareto,.pb-offender,.pb-activity,.pb-metric,.pb-empty-light{background:#071321!important;border-color:rgba(148,163,184,.14)!important;color:#e8f2fc!important}
+    .pb-actual-box{background:#0f3146!important;border-color:#22d3ee!important;box-shadow:inset 5px 0 #22d3ee!important}
+    .pb-activity-copy strong,.pb-offender-title strong,.pb-metric-head strong{color:#f8fbff!important}
+    .pb-activity-copy span,.pb-offender-title span,.pb-metric-foot,.pb-pareto-legend{color:#8fa4bd!important}
+    .pb-card-head{border-bottom-color:rgba(148,163,184,.12)!important}
+    .financial-summary{display:none!important}
+    .curve-panel{background:#0e1f34!important;border-color:rgba(148,163,184,.16)!important;color:#e8f2fc!important}
+    .financial-title{background:transparent!important;border-bottom:1px solid rgba(148,163,184,.12)!important;color:#e8f2fc!important}
+    .financial-title-copy h2,.financial-title-copy h3{color:#f8fbff!important}
+    .financial-logo b,.financial-logo span{color:#22d3ee!important}
+    .financial-title-meta strong,.financial-title-meta small{color:#8fa4bd!important}
+    .curve-panel .curve-canvas-shell{background:transparent!important;margin:0!important;padding:12px!important;border-radius:0!important;height:470px!important}
+    .curve-panel .curve-empty{background:#0e1f34!important;color:#8fa4bd!important}
+    .unit-phase-chart-panel,.phase-summary-panel,.delay-panel,.unit-toolbar{background:#0e1f34!important;border-color:rgba(148,163,184,.16)!important}
+    .coordination-ppt-panel{margin-bottom:16px;padding:16px;border:1px solid rgba(34,211,238,.18);border-radius:16px;background:#0e1f34;color:#e8f2fc}
+    .coordination-ppt-panel.hidden{display:none!important}
+    .coordination-ppt-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+    .coordination-ppt-head h3{margin:0;font-size:1rem}.coordination-ppt-head small{color:#8fa4bd}
+    .coordination-slide-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+    .coordination-slide{padding:12px;border:1px solid rgba(148,163,184,.14);border-radius:12px;background:#071321;color:#cfe2f5;min-height:88px}
+    .coordination-slide strong{display:block;margin-bottom:6px;color:#22d3ee}.coordination-slide p{margin:0;white-space:pre-wrap;line-height:1.35;font-size:.82rem}
+  </style>
 </head>
 <body>
   <section id="upload-view" class="upload-view">
@@ -38,6 +72,7 @@
       </div>
 
       <input id="excel-input" type="file" accept=".xlsb,.xlsx,.xlsm" hidden>
+      <input id="ppt-input" type="file" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden>
       <p class="privacy-note">O Excel é processado localmente. Somente ao clicar em <strong>Publicar atualização</strong> o dataset tratado do BI é enviado ao Supabase.</p>
       <div id="upload-error" class="alert hidden" role="alert"></div>
     </div>
@@ -53,8 +88,8 @@
     <aside id="sidebar" class="sidebar">
       <div class="sidebar-brand"><span>BI</span> EPC-15</div>
       <nav class="main-nav" aria-label="Navegação principal">
-        <button class="nav-item active" data-page="executive"><span>01</span> Visão Executiva</button>
-        <button class="nav-item" data-page="pb"><span>02</span> Visão PB</button>
+        <button class="nav-item active" data-page="executive"><span>01</span> Painel Gerencial</button>
+        <button class="nav-item" data-page="pb"><span>02</span> Reunião de Coordenação</button>
         <div class="nav-group-label">UNIDADES</div>
         <div id="unit-nav"></div>
         <button class="nav-item" data-page="analysis"><span>03</span> Análises</button>
@@ -71,7 +106,7 @@
       <header class="topbar">
         <div>
           <p class="eyebrow">CONTRATO EPC-15</p>
-          <h2 id="page-title">Visão Executiva</h2>
+          <h2 id="page-title">Painel Gerencial</h2>
         </div>
         <div class="topbar-actions">
           <div class="cloud-controls">
@@ -81,6 +116,7 @@
               <button id="publish-update" class="cloud-button cloud-button-primary" type="button" disabled>Publicar atualização</button>
             </div>
           </div>
+          <button id="select-ppt-dashboard" class="cpl-ppt-button" type="button">Inserir PowerPoint</button>
           <button id="select-excel-dashboard" class="dashboard-file-button" type="button">Selecionar Excel</button>
           <div class="topbar-meta">
             <span>Data-base</span>
@@ -120,12 +156,11 @@
         </div>
       </section>
 
-
       <section id="page-pb" class="page pb-page">
         <div class="pb-filterbar">
           <div class="pb-filter-title">
-            <span class="pb-petrobras-pill">PETROBRAS</span>
-            <div><strong>VISÃO PB</strong><small id="pb-file-info"></small></div>
+            <span class="pb-petrobras-pill">CPL</span>
+            <div><strong>REUNIÃO DE COORDENAÇÃO</strong><small id="pb-file-info"></small></div>
           </div>
           <label>UNIDADE<select id="pb-unit-filter"><option value="">Todas as Unidades</option></select></label>
           <label>FASE<select id="pb-phase-filter"><option value="">Todas as Fases</option></select></label>
@@ -244,7 +279,6 @@
               </div>
               <div class="financial-title-meta"><strong id="unit-curve-date">Data-base: —</strong><small id="unit-curve-source">Fonte financeira</small></div>
             </div>
-            <div id="unit-financial-summary" class="financial-summary"></div>
             <div class="curve-canvas-shell">
               <canvas id="unit-curve-chart"></canvas>
               <div id="unit-curve-empty" class="curve-empty">Não foi possível montar a curva financeira desta unidade a partir das abas-fonte.</div>
@@ -338,5 +372,117 @@
   <script src="js/presentation.js"></script>
   <script src="js/export.js"></script>
   <script src="js/app.js"></script>
+  <script>
+    (function(){
+      const PPT_KEY = 'epc15_coordination_ppt_v1';
+      const pageTitles = { executive:'Painel Gerencial', pb:'Reunião de Coordenação', analysis:'Análises' };
+
+      function applyTitles(){
+        const executive = document.querySelector('[data-page="executive"]');
+        const pb = document.querySelector('[data-page="pb"]');
+        if (executive) executive.innerHTML = '<span>01</span> Painel Gerencial';
+        if (pb) pb.innerHTML = '<span>02</span> Reunião de Coordenação';
+        const active = document.querySelector('.page.active')?.id?.replace('page-','');
+        const title = active && pageTitles[active] ? pageTitles[active] : document.getElementById('page-title')?.textContent;
+        if (title) document.getElementById('page-title').textContent = title;
+      }
+
+      function restyleFinanceChart(){
+        const chart = window.Chart && Chart.getChart ? Chart.getChart('unit-curve-chart') : null;
+        if (!chart) return;
+        chart.options.scales.x.grid.color = 'rgba(148,163,184,.15)';
+        chart.options.scales.y.grid.color = 'rgba(148,163,184,.15)';
+        chart.options.scales.x.ticks.color = '#8fa4bd';
+        chart.options.scales.y.ticks.color = '#8fa4bd';
+        chart.options.plugins.legend.labels.color = '#cfe2f5';
+        chart.update('none');
+      }
+
+      function ensurePptPanel(){
+        const page = document.getElementById('page-pb');
+        if (!page || document.getElementById('coordination-ppt-panel')) return;
+        const panel = document.createElement('article');
+        panel.id = 'coordination-ppt-panel';
+        panel.className = 'coordination-ppt-panel hidden';
+        panel.innerHTML = '<div class="coordination-ppt-head"><div><p class="eyebrow">REUNIÃO DE APRESENTAÇÃO</p><h3>Conteúdo do PowerPoint</h3><small id="coordination-ppt-file"></small></div><button id="clear-ppt" class="cloud-button" type="button">Limpar PowerPoint</button></div><div id="coordination-slide-grid" class="coordination-slide-grid"></div>';
+        const filter = page.querySelector('.pb-filterbar');
+        filter?.insertAdjacentElement('afterend', panel);
+        document.getElementById('clear-ppt')?.addEventListener('click', () => { localStorage.removeItem(PPT_KEY); renderPptPanel(); });
+      }
+
+      function pptData(){
+        try { return JSON.parse(localStorage.getItem(PPT_KEY) || 'null'); } catch(_) { return null; }
+      }
+
+      function savePptData(data){ localStorage.setItem(PPT_KEY, JSON.stringify(data)); renderPptPanel(); }
+
+      function renderPptPanel(){
+        ensurePptPanel();
+        const data = pptData();
+        const panel = document.getElementById('coordination-ppt-panel');
+        const file = document.getElementById('coordination-ppt-file');
+        const grid = document.getElementById('coordination-slide-grid');
+        if (!panel || !grid) return;
+        if (!data || !data.slides?.length){ panel.classList.add('hidden'); grid.innerHTML=''; return; }
+        panel.classList.remove('hidden');
+        if (file) file.textContent = `${data.fileName || 'PowerPoint'} • ${data.slides.length} slides importados`;
+        grid.innerHTML = data.slides.map(s => `<section class="coordination-slide"><strong>Slide ${s.number}</strong><p>${escapeHtml(s.text || 'Sem texto extraído')}</p></section>`).join('');
+      }
+
+      function escapeHtml(value){ return String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch])); }
+
+      async function readPptx(file){
+        if (!window.JSZip) throw new Error('Leitor de PowerPoint indisponível.');
+        const zip = await JSZip.loadAsync(await file.arrayBuffer());
+        const slideFiles = Object.keys(zip.files).filter(name => /^ppt\/slides\/slide\d+\.xml$/.test(name)).sort((a,b) => Number(a.match(/slide(\d+)/)[1]) - Number(b.match(/slide(\d+)/)[1]));
+        const slides = [];
+        const parser = new DOMParser();
+        for (const name of slideFiles){
+          const xml = await zip.file(name).async('text');
+          const doc = parser.parseFromString(xml, 'application/xml');
+          const text = [...doc.getElementsByTagNameNS('*','t')].map(n => n.textContent.trim()).filter(Boolean).join('\n');
+          slides.push({ number:Number(name.match(/slide(\d+)/)[1]), text });
+        }
+        return { fileName:file.name, importedAt:new Date().toISOString(), slides };
+      }
+
+      function installPptHandlers(){
+        const input = document.getElementById('ppt-input');
+        const button = document.getElementById('select-ppt-dashboard');
+        button?.addEventListener('click', () => input?.click());
+        input?.addEventListener('change', async event => {
+          const file = event.target.files?.[0];
+          if (!file) return;
+          try { savePptData(await readPptx(file)); Dashboard?.showPage?.('pb'); }
+          catch (error) { alert(error.message || 'Não foi possível ler o PowerPoint.'); }
+          finally { input.value=''; }
+        });
+      }
+
+      function patchDashboards(){
+        if (window.Dashboard && !Dashboard.__cplPatched){
+          const originalShowPage = Dashboard.showPage;
+          Dashboard.showPage = function(page){ const r = originalShowPage.apply(this, arguments); applyTitles(); renderPptPanel(); return r; };
+          Dashboard.__cplPatched = true;
+        }
+        if (window.DashboardCharts && !DashboardCharts.__cplPatched){
+          const originalCurve = DashboardCharts.financialCurve;
+          DashboardCharts.financialCurve = function(curve){ const ok = originalCurve.apply(this, arguments); setTimeout(restyleFinanceChart, 0); return ok; };
+          DashboardCharts.__cplPatched = true;
+        }
+        if (window.PBDashboard && !PBDashboard.__cplPatched){
+          const originalExport = PBDashboard.exportManualData;
+          const originalImport = PBDashboard.importManualData;
+          PBDashboard.exportManualData = function(){ const base = originalExport ? originalExport.apply(this, arguments) : {}; return { ...base, coordinationDeck:pptData() }; };
+          PBDashboard.importManualData = function(payload){ if (originalImport) originalImport.apply(this, arguments); if (payload?.coordinationDeck) savePptData(payload.coordinationDeck); renderPptPanel(); };
+          PBDashboard.__cplPatched = true;
+        }
+      }
+
+      window.addEventListener('DOMContentLoaded', () => { applyTitles(); ensurePptPanel(); renderPptPanel(); installPptHandlers(); setTimeout(patchDashboards, 0); });
+      window.addEventListener('load', () => { patchDashboards(); applyTitles(); renderPptPanel(); });
+      document.addEventListener('click', () => setTimeout(() => { applyTitles(); renderPptPanel(); restyleFinanceChart(); }, 0));
+    }());
+  </script>
 </body>
 </html>
