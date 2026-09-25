@@ -9,14 +9,14 @@ Dashboard executivo estático para leitura do acompanhamento físico do contrato
 3. Para o BI EPC-15, clique em **Selecionar Excel** e escolha o arquivo oficial de acompanhamento em `.xlsb`, `.xlsx` ou `.xlsm`.
 4. Para o painel de rundown, clique em **Abrir BI Rundown** na tela inicial ou em **BI Rundown** no menu lateral. O link abre `rundown.html`.
 
-Também é possível publicar o conteúdo diretamente no GitHub Pages, pois todos os caminhos são relativos e não há backend.
+O GitHub Pages continua sendo o frontend. A integração opcional com Supabase permite publicar snapshots do dataset tratado para que outro computador carregue automaticamente a mesma versão, sem precisar do Excel.
 
 ## Fonte e processamento dos dados
 
 - Aba obrigatória: `Avanço PLATAQ`.
 - Aba complementar: `PPT_RESUMO`.
-- O arquivo selecionado não é enviado para servidor, API ou banco de dados.
-- A leitura é feita na memória do navegador.
+- O Excel bruto continua sendo lido na memória do navegador.
+- Ao clicar em **Publicar atualização**, somente o dataset já tratado pelo BI e os textos manuais da Visão PB são enviados ao Supabase; o arquivo Excel bruto não é enviado.
 - A aplicação detecta automaticamente as unidades consolidadas de nível 1.
 - Os resumos usam o primeiro bloco hierárquico da aba `Avanço PLATAQ`, organizado por unidade.
 - O segundo bloco hierárquico, que reorganiza o contrato por disciplina, é ignorado nos totais para evitar dupla contagem.
@@ -46,6 +46,8 @@ index.html
 rundown.html
 css/style.css
 js/config.js
+js/supabase-config.js
+js/cloud-sync.js
 js/excel-reader.js
 js/data-model.js
 js/charts.js
@@ -66,10 +68,30 @@ O `index.html` funciona como entrada principal do projeto.
 - **Abrir BI Rundown**: abre diretamente `rundown.html`.
 - Após carregar o BI EPC-15, o menu lateral também possui a opção **BI Rundown** para acessar o mesmo painel.
 
+## Sincronização entre computadores
+
+A branch de integração adiciona o fluxo:
+
+```text
+Excel local → parser existente → modelo padronizado → BI
+                                      ↓
+                               Publicar atualização
+                                      ↓
+                                  Supabase
+                                      ↓
+                           versão atual + histórico
+                                      ↓
+                          outro PC carrega o mesmo BI
+```
+
+O Supabase usa somente publishable key no navegador. As tabelas ficam sem acesso direto e a leitura/publicação ocorre por RPC protegida pelo login compartilhado. O arquivo `supabase/migrations/001_bi_publications.sql` contém o esquema.
+
+Se o Supabase estiver indisponível, a importação local do Excel continua funcionando.
+
 ## Limitações da V1
 
 - não gera PowerPoint `.pptx`;
-- não possui backend, login, histórico ou sincronização;
+- a sincronização Supabase só fica ativa depois que um projeto exclusivo for configurado em `js/supabase-config.js`;
 - não cria Curva S histórica;
 - não compara versões ou datas-base diferentes;
 - não recalcula fórmulas do Excel;
