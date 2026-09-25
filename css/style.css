@@ -141,3 +141,34 @@
 .cloud-button:disabled{opacity:.4;cursor:not-allowed}
 @media(max-width:1100px){.topbar{height:auto;min-height:82px;padding-top:12px;padding-bottom:12px}.topbar-actions{flex-wrap:wrap;justify-content:flex-end}.cloud-controls{order:3;width:100%;min-width:0;align-items:flex-end}}
 @media(max-width:760px){.topbar-actions{align-items:flex-end;flex-direction:column}.cloud-controls{align-items:flex-start}.source-status{text-align:left}.cloud-buttons{justify-content:flex-start;flex-wrap:wrap}}
+
+/* Reunião de Coordenação — PowerPoint estruturado */
+.coordination-deck-panel{margin-top:14px;padding:14px;border:1px solid rgba(34,211,238,.18);border-radius:14px;background:#0e1f34;color:#e8f2fc;overflow:hidden}
+.coordination-deck-panel.hidden{display:none!important}
+.coordination-deck-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:10px}
+.coordination-deck-toolbar h3{margin:2px 0 3px;color:#f8fbff;font-size:.98rem}
+.coordination-deck-toolbar small{color:#8fa4bd;font-size:.62rem}
+.coordination-deck-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap}
+.coordination-deck-actions button{padding:7px 10px;border:1px solid rgba(148,163,184,.2);border-radius:7px;background:#071321;color:#bcd1e5;font-size:.62rem;font-weight:800;cursor:pointer}
+.coordination-deck-actions button:hover{border-color:#22d3ee;color:#fff}
+.coordination-deck-actions span{padding:0 5px;color:#8fa4bd;font-size:.62rem;font-weight:800}
+.coordination-deck-warning{margin:0 0 10px;padding:8px 10px;border:1px solid rgba(245,158,11,.35);border-radius:8px;background:rgba(245,158,11,.08);color:#fcd34d;font-size:.66rem}
+.coordination-deck-warning.hidden{display:none!important}
+.coordination-deck-page{padding:14px;border:1px solid rgba(148,163,184,.16);border-radius:12px;background:#07111f;min-height:260px}
+.coordination-page-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;padding-bottom:10px;border-bottom:1px solid rgba(148,163,184,.13)}
+.coordination-page-head small{display:block;color:#22d3ee;font-size:.58rem;font-weight:900;letter-spacing:.12em}
+.coordination-page-head h3{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:4px 0 0;color:#f8fbff;font-size:1.05rem}
+.coordination-page-head h3 span{padding:4px 7px;border-radius:5px;background:rgba(245,158,11,.12);color:#fbbf24;font-size:.64rem}
+.coordination-page-meta{text-align:right}.coordination-page-meta strong{display:block;color:#f8fbff;font-size:.82rem}.coordination-page-meta span{display:block;margin-top:4px;color:#8fa4bd;font-size:.6rem}
+.coordination-page-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0}
+.coordination-page-kpis>div{padding:9px 10px;border:1px solid rgba(148,163,184,.14);border-radius:8px;background:#0d1d30}
+.coordination-page-kpis span{display:block;color:#7f97b2;font-size:.55rem;font-weight:800;letter-spacing:.08em}.coordination-page-kpis strong{display:block;margin-top:4px;color:#f8fbff;font-size:1.05rem}
+.coordination-page-body{display:grid;gap:10px}.coordination-block{padding:10px;border:1px solid rgba(148,163,184,.13);border-radius:9px;background:#0b192a}.coordination-block h4{margin:0 0 8px;color:#9fe9f4;font-size:.7rem;letter-spacing:.04em}
+.coordination-table-wrap{overflow:auto}.coordination-table-wrap table{width:100%;border-collapse:collapse;font-size:.62rem}.coordination-table-wrap th,.coordination-table-wrap td{padding:6px 7px;border-bottom:1px solid rgba(148,163,184,.12);text-align:left}.coordination-table-wrap th{color:#8fa4bd;font-size:.55rem;text-transform:uppercase;letter-spacing:.06em}.coordination-table-wrap td{color:#d8e6f5}
+.coordination-action-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.coordination-action-card{padding:9px;border:1px solid rgba(148,163,184,.13);border-radius:8px;background:#071321}.coordination-action-card>strong{display:block;margin-bottom:7px;color:#fff;font-size:.68rem}.coordination-action-card>div{margin-top:6px}.coordination-action-card span{display:block;color:#22d3ee;font-size:.5rem;font-weight:900;letter-spacing:.08em}.coordination-action-card p{margin:3px 0 0;color:#c5d7e8;font-size:.61rem;line-height:1.35;white-space:pre-line}.coordination-action-card small{display:block;margin-top:6px;color:#667e98;font-size:.5rem}
+.coordination-raw p{margin:0;color:#bacde0;font-size:.64rem;line-height:1.45;white-space:pre-line}
+.coordination-empty{display:grid;place-items:center;min-height:180px;padding:25px;color:#8fa4bd;text-align:center;font-size:.7rem}
+.pb-offender-head{grid-template-columns:24px minmax(0,1fr) auto auto auto}
+.pb-offender-ppt{padding:3px 5px;border:1px solid rgba(34,211,238,.28);border-radius:4px;background:rgba(34,211,238,.08);color:#7de8f6;font-size:.5rem;font-weight:900;white-space:nowrap}
+@media(max-width:980px){.coordination-deck-toolbar{align-items:flex-start;flex-direction:column}.coordination-deck-actions{justify-content:flex-start}.coordination-action-list{grid-template-columns:1fr}}
+@media(max-width:650px){.coordination-page-kpis{grid-template-columns:1fr}.coordination-page-head{flex-direction:column}.coordination-page-meta{text-align:left}}
