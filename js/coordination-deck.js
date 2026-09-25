@@ -1,5 +1,5 @@
 (function () {
-  const KEY = 'epc15_coordination_deck_v2';
+  const KEY_PREFIX = 'epc15_coordination_deck_v3::W';
   const LEGACY_KEY = 'epc15_coordination_ppt_v1';
   let pageIndex = 0;
   let installed = false;
@@ -10,22 +10,35 @@
     .toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
   const clean = value => String(value == null ? '' : value).replace(/\s+/g,' ').trim();
 
-  function read() {
-    try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (_) { return null; }
+  function selectedWeek(explicitWeek) {
+    const direct = Number(explicitWeek);
+    if (Number.isFinite(direct) && direct > 0) return direct;
+    const manager = Number(window.CoordinationWeek?.getSelectedWeek?.());
+    if (Number.isFinite(manager) && manager > 0) return manager;
+    const select = Number(document.getElementById('pb-week-filter')?.value);
+    return Number.isFinite(select) && select > 0 ? select : 26;
   }
 
-  function write(data) {
-    try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (_) {}
-    pageIndex = 0;
-    render();
-    document.dispatchEvent(new CustomEvent('coordinationdeckchange'));
+  function storageKey(weekNo) {
+    return KEY_PREFIX + selectedWeek(weekNo);
   }
 
-  function clear() {
-    try { localStorage.removeItem(KEY); localStorage.removeItem(LEGACY_KEY); } catch (_) {}
+  function read(weekNo) {
+    try { return JSON.parse(localStorage.getItem(storageKey(weekNo)) || 'null'); } catch (_) { return null; }
+  }
+
+  function write(data, weekNo) {
+    try { localStorage.setItem(storageKey(weekNo), JSON.stringify(data)); } catch (_) {}
     pageIndex = 0;
     render();
-    document.dispatchEvent(new CustomEvent('coordinationdeckchange'));
+    document.dispatchEvent(new CustomEvent('coordinationdeckchange', { detail:{ weekNo:selectedWeek(weekNo) } }));
+  }
+
+  function clear(weekNo) {
+    try { localStorage.removeItem(storageKey(weekNo)); localStorage.removeItem(LEGACY_KEY); } catch (_) {}
+    pageIndex = 0;
+    render();
+    document.dispatchEvent(new CustomEvent('coordinationdeckchange', { detail:{ weekNo:selectedWeek(weekNo) } }));
   }
 
   function localChildren(node, name) {
@@ -436,8 +449,8 @@
     });
   }
 
-  function status() {
-    const data=read();
+  function status(weekNo) {
+    const data=read(weekNo);
     if(!data?.slides?.length) return null;
     const dates=[...new Set(data.slides.map(s=>s.dataBase).filter(Boolean))];
     return {
@@ -460,14 +473,15 @@
     // Não existe mais um painel de texto separado no fim da página.
   }
 
-  async function importFile(file) {
+  async function importFile(file, weekNo) {
     const data=await parse(file);
-    write(data);
+    write(data, weekNo);
     return data;
   }
 
-  function exportData(){ return read(); }
-  function importData(data){ if(data?.slides?.length) write(data); }
+  function exportData(weekNo){ return read(weekNo); }
+  function importData(data, weekNo){ if(data?.slides?.length) write(data, weekNo); }
+  function clearWeek(weekNo){ clear(weekNo); }
 
   function install() {
     if (installed) return;
@@ -479,11 +493,15 @@
       const file=event.target.files?.[0];
       if(!file) return;
       try{
+        if (window.CoordinationWeek && !window.CoordinationWeek.canEdit()) {
+          throw new Error('Clique no lápis e informe a senha master antes de atualizar o PowerPoint.');
+        }
         button.disabled=true;
         button.textContent='Lendo PowerPoint...';
-        await importFile(file);
+        await importFile(file, selectedWeek());
         window.Dashboard?.showPage?.('pb');
         window.PBDashboard?.render?.();
+        window.CoordinationWeek?.refreshStatus?.();
       }catch(error){
         alert(error.message||'Não foi possível ler o PowerPoint.');
         console.error(error);
@@ -497,7 +515,7 @@
   }
 
   window.CoordinationDeck={
-    install,render,parse,read,clear,exportData,importData,
+    install,render,parse,read,clear,clearWeek,exportData,importData,
     pagesFor,actionsFor,metricsFor,lookaheadFor,matchAction,status,importedAfter
   };
   window.addEventListener('DOMContentLoaded',install);
