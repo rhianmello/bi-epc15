@@ -184,7 +184,11 @@
       masterPassword=password;
       unlockedWeek=week;
       closeMasterModal();
-      usingLiveDraft = !activeSnapshot;
+      // Ao liberar edição, a tela passa a usar o Excel mais recente.
+      // A versão salva continua preservada até o usuário clicar em "Salvar semana".
+      usingLiveDraft = true;
+      activeSnapshot = false;
+      window.PBDashboard?.useLive?.();
       updateEditState();
       window.PBDashboard?.render?.();
     } catch(error) {
