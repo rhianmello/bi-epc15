@@ -156,11 +156,16 @@
     if (title) title.textContent = titleCaseUnit(unit.rawName).toUpperCase();
     if (dateEl) dateEl.textContent = 'Data-base: ' + date(model.dataBase);
     if (sourceEl) {
-      sourceEl.textContent = curve?.source === 'blplanataq-direct'
-        ? 'Fonte: BLPlanAtaq • linhas % Acum (T/U/V+)'
-        : curve?.source === 'financial-sheets'
-          ? 'Fonte alternativa: abas financeiras'
-          : 'Fonte legada: CURVAS';
+      if (curve?.source === 'blplanataq-summary') {
+        const rows = curve.sourceRows ? Object.values(curve.sourceRows).filter(Number.isFinite) : [];
+        sourceEl.textContent = rows.length
+          ? 'Fonte: BLPlanAtaq • linhas ' + Math.min(...rows) + '–' + Math.max(...rows)
+          : 'Fonte: BLPlanAtaq • blocos financeiros';
+      } else if (curve?.source === 'financial-sheets') {
+        sourceEl.textContent = 'Fonte alternativa: abas financeiras';
+      } else {
+        sourceEl.textContent = 'Fonte legada: CURVAS';
+      }
     }
     if (!summaryEl) return;
     const s = curve?.summary;
@@ -169,15 +174,18 @@
       return;
     }
     const diffClass = v => Number.isFinite(v) && v >= 0 ? 'positive' : 'negative';
+    const realMonth = s.realMonth;
+    const contractMonthDiff = Number.isFinite(realMonth)&&Number.isFinite(s.contractualMonth) ? realMonth-s.contractualMonth : null;
+    const planMonthDiff = Number.isFinite(realMonth)&&Number.isFinite(s.planMonth) ? realMonth-s.planMonth : null;
     summaryEl.innerHTML = `
-      <div class="financial-summary-row financial-summary-head">
-        <span>Referência</span><span>Previsto Acum.</span><span>Real Acum.</span><span>Diferença</span>
+      <div class="financial-summary-row financial-summary-head financial-summary-seven">
+        <span>Referência</span><span>Previsto Mês</span><span>Real Mês</span><span>Diferença</span><span>Previsto Acum.</span><span>Real Acum.</span><span>Diferença</span>
       </div>
-      <div class="financial-summary-row">
-        <strong>BL Contratual</strong><span>${currency(s.contractualValue)}</span><span>${currency(s.actualValue)}</span><b class="${diffClass(s.contractualDifference)}">${currency(s.contractualDifference)}</b>
+      <div class="financial-summary-row financial-summary-seven">
+        <strong>BL Contratual</strong><span>${currency(s.contractualMonth)}</span><span>${currency(realMonth)}</span><b class="${diffClass(contractMonthDiff)}">${currency(contractMonthDiff)}</b><span>${currency(s.contractualValue)}</span><span>${currency(s.actualValue)}</span><b class="${diffClass(s.contractualDifference)}">${currency(s.contractualDifference)}</b>
       </div>
-      <div class="financial-summary-row attack">
-        <strong>Plano de Ataque</strong><span>${currency(s.planValue)}</span><span>${currency(s.actualValue)}</span><b class="${diffClass(s.planDifference)}">${currency(s.planDifference)}</b>
+      <div class="financial-summary-row financial-summary-seven attack">
+        <strong>Plano de Ataque</strong><span>${currency(s.planMonth)}</span><span>${currency(realMonth)}</span><b class="${diffClass(planMonthDiff)}">${currency(planMonthDiff)}</b><span>${currency(s.planValue)}</span><span>${currency(s.actualValue)}</span><b class="${diffClass(s.planDifference)}">${currency(s.planDifference)}</b>
       </div>`;
   }
 
