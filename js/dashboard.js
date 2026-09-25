@@ -28,9 +28,19 @@
     if (window.PBDashboard) window.PBDashboard.init(model, fileName);
   }
 
+  function titleCaseUnit(raw) {
+    const match = String(raw || '').match(/^(U-\d{4})\s*[-–]\s*(.+)$/i);
+    if (!match) return raw || '';
+    const small = new Set(['de','da','do','das','dos','e']);
+    const name = match[2].toLocaleLowerCase('pt-BR').split(/\s+/).map((word,i) =>
+      i > 0 && small.has(word) ? word : word.charAt(0).toLocaleUpperCase('pt-BR') + word.slice(1)
+    ).join(' ');
+    return match[1].toUpperCase() + ' - ' + name;
+  }
+
   function renderUnitNavigation() {
     document.getElementById('unit-nav').innerHTML = model.units.map((unit, index) =>
-      `<button class="nav-item unit-nav-item" data-unit-index="${index}">${escapeHtml(unit.code)}</button>`).join('');
+      `<button class="nav-item unit-nav-item" data-unit-index="${index}" title="${escapeHtml(unit.rawName)}">${escapeHtml(titleCaseUnit(unit.rawName))}</button>`).join('');
   }
 
   function renderExecutive() {
@@ -138,6 +148,33 @@
     }).join('');
   }
 
+  function renderFinancialHeader(unit, curve) {
+    const title = document.getElementById('unit-curve-unit');
+    const dateEl = document.getElementById('unit-curve-date');
+    const summaryEl = document.getElementById('unit-financial-summary');
+    const sourceEl = document.getElementById('unit-curve-source');
+    if (title) title.textContent = titleCaseUnit(unit.rawName).toUpperCase();
+    if (dateEl) dateEl.textContent = 'Data-base: ' + date(model.dataBase);
+    if (sourceEl) sourceEl.textContent = curve?.source === 'financial-sheets' ? 'Fonte: BLContratual + BLPlanAtaq + Corrente + BLProjetada' : 'Fonte legada: CURVAS';
+    if (!summaryEl) return;
+    const s = curve?.summary;
+    if (!s) {
+      summaryEl.innerHTML = '<div class="financial-summary-empty">Resumo financeiro não disponível para esta unidade.</div>';
+      return;
+    }
+    const diffClass = v => Number.isFinite(v) && v >= 0 ? 'positive' : 'negative';
+    summaryEl.innerHTML = `
+      <div class="financial-summary-row financial-summary-head">
+        <span>Referência</span><span>Previsto Acum.</span><span>Real Acum.</span><span>Diferença</span>
+      </div>
+      <div class="financial-summary-row">
+        <strong>BL Contratual</strong><span>${currency(s.contractualValue)}</span><span>${currency(s.actualValue)}</span><b class="${diffClass(s.contractualDifference)}">${currency(s.contractualDifference)}</b>
+      </div>
+      <div class="financial-summary-row attack">
+        <strong>Plano de Ataque</strong><span>${currency(s.planValue)}</span><span>${currency(s.actualValue)}</span><b class="${diffClass(s.planDifference)}">${currency(s.planDifference)}</b>
+      </div>`;
+  }
+
   function renderUnitSummary() {
     if (!currentUnit) return;
     const u = currentUnit;
@@ -160,6 +197,7 @@
     DashboardCharts.phaseProgress(phaseRows);
     renderDelayedItems(u);
 
+    renderFinancialHeader(u, u.curve);
     const curveOk = DashboardCharts.financialCurve(u.curve);
     const empty = document.getElementById('unit-curve-empty');
     if (empty) empty.classList.toggle('hidden', curveOk);
