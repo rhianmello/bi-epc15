@@ -275,16 +275,27 @@
       const id = offenderId(row);
       const note = notes[id] || {};
       const cls = offenderClass(row);
+      const selected = selection();
+      const pptMatch = window.CoordinationDeck?.matchAction?.(
+        row.__unit,
+        selected.phase || row.phase || '',
+        offenderLabel(row),
+        offenderContext(row)
+      );
+      const cause = note.cause || pptMatch?.cause || '';
+      const recovery = note.mitigation || pptMatch?.plan || '';
+      const pptBadge = pptMatch ? '<span class="pb-offender-ppt" title="Conteúdo importado do PowerPoint">PPT · S' + pptMatch.sourceSlide + '</span>' : '';
       return '<article class="pb-offender pb-offender-' + cls.key + '" data-offender-id="' + esc(id) + '">' +
         '<div class="pb-offender-head">' +
           '<span class="pb-offender-number">' + String(index+1).padStart(2,'0') + '</span>' +
           '<div class="pb-offender-title"><strong>' + esc(offenderLabel(row)) + '</strong><span>' + esc(offenderContext(row) || row.__unit) + '</span></div>' +
+          pptBadge +
           '<span class="pb-offender-impact">' + esc(pp(row.variance)) + '</span>' +
           '<span class="pb-offender-tag">' + cls.label + '</span>' +
         '</div>' +
         '<div class="pb-offender-body">' +
-          '<label><span>CAUSA RAIZ</span><textarea data-offender-field="cause" placeholder="Digite a causa raiz...">' + esc(note.cause || '') + '</textarea></label>' +
-          '<label><span>PLANO DE MITIGAÇÃO</span><textarea data-offender-field="mitigation" placeholder="Digite o plano de mitigação...">' + esc(note.mitigation || '') + '</textarea></label>' +
+          '<label><span>CAUSA RAIZ</span><textarea data-offender-field="cause" placeholder="Digite a causa raiz...">' + esc(cause) + '</textarea></label>' +
+          '<label><span>PLANO DE RECUPERAÇÃO</span><textarea data-offender-field="mitigation" placeholder="Digite o plano de recuperação...">' + esc(recovery) + '</textarea></label>' +
         '</div>' +
       '</article>';
     }).join('');
@@ -501,6 +512,7 @@
     renderOffenders();
     renderActivities();
     renderMetrics();
+    window.CoordinationDeck?.render?.();
   }
 
   function exportManualData() {
@@ -513,7 +525,8 @@
     }
     return {
       activities,
-      offenderNotes: readJson('epc15_pb_offender_notes_v1', {})
+      offenderNotes: readJson('epc15_pb_offender_notes_v1', {}),
+      coordinationDeck: window.CoordinationDeck?.exportData?.() || null
     };
   }
 
@@ -526,6 +539,7 @@
     if (payload.offenderNotes && typeof payload.offenderNotes === 'object') {
       writeJson('epc15_pb_offender_notes_v1', payload.offenderNotes);
     }
+    if (payload.coordinationDeck) window.CoordinationDeck?.importData?.(payload.coordinationDeck);
     if (model) render();
   }
 
