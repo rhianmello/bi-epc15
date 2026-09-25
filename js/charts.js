@@ -57,11 +57,11 @@
     if (!canvas) return false;
 
     const labels = curve.labels || curve.series.find(s => s.categories?.length)?.categories || [];
-    const rawSource = curve.source === 'financial-sheets';
+    const rawSource = curve.source === 'financial-sheets' || curve.source === 'blplanataq-direct';
     const styles = {
       planAttack:{color:'#69a9e7',dash:[],width:1.8,points:0},
       contractual:{color:'#0b2f70',dash:[],width:2.0,points:0},
-      real:{color:'#159447',dash:[],width:2.2,points:5},
+      real:{color:'#00a651',dash:[],width:2.2,points:0},
       projected:{color:'#f2b700',dash:[7,5],width:2.0,points:0}
     };
     const fallback = ['#60a5fa','#0f172a','#22c55e','#f59e0b','#8b5cf6','#ef4444'];
@@ -79,8 +79,8 @@
         backgroundColor:st.color,
         borderWidth:st.width,
         borderDash:st.dash,
-        pointRadius:s.key === 'real' ? data.map(v => Number.isFinite(v) ? 4 : 0) : st.points,
-        pointHoverRadius:s.key === 'real' ? 6 : 3,
+        pointRadius:st.points,
+        pointHoverRadius:3,
         tension:.12,
         spanGaps:false
       };
