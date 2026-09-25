@@ -172,3 +172,13 @@
 .pb-offender-ppt{padding:3px 5px;border:1px solid rgba(34,211,238,.28);border-radius:4px;background:rgba(34,211,238,.08);color:#7de8f6;font-size:.5rem;font-weight:900;white-space:nowrap}
 @media(max-width:980px){.coordination-deck-toolbar{align-items:flex-start;flex-direction:column}.coordination-deck-actions{justify-content:flex-start}.coordination-action-list{grid-template-columns:1fr}}
 @media(max-width:650px){.coordination-page-kpis{grid-template-columns:1fr}.coordination-page-head{flex-direction:column}.coordination-page-meta{text-align:left}}
+
+/* PPT alimenta os cards da Reunião de Coordenação; não há painel separado */
+#coordination-deck-panel,#coordination-ppt-panel{display:none!important}
+.pb-activity-ppt{grid-template-columns:28px minmax(0,1fr) auto auto;border-color:rgba(34,211,238,.24);background:rgba(34,211,238,.045)}
+.pb-activity-ppt .pb-activity-icon{background:rgba(34,211,238,.12);color:#67e8f9}
+.pb-activity-ppt .pb-activity-status{background:rgba(34,211,238,.1);color:#7de8f6}
+.pb-activity-context,.pb-metric-context{display:block;margin-top:3px;color:#607a96;font-size:.52rem}
+.pb-source-chip{padding:4px 6px;border-radius:5px;background:#102942;color:#7de8f6;font-size:.54rem;font-weight:900}
+.pb-metrics-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(max-width:760px){.pb-metrics-grid{grid-template-columns:1fr}.pb-activity-ppt{grid-template-columns:28px minmax(0,1fr) auto}.pb-source-chip{grid-column:3}}
