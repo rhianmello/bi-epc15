@@ -220,6 +220,105 @@
     }
   }
 
+
+  function wsValue(ws, r, c) {
+    const cell = ws?.[XLSX.utils.encode_cell({ r, c })];
+    return cell ? (cell.v ?? null) : null;
+  }
+
+  function financialHeaderIndex(ws, aliases) {
+    if (!ws?.['!ref']) return -1;
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    for (let c = range.s.c; c <= Math.min(range.e.c, 80); c += 1) {
+      const value = normalizeHeader(wsValue(ws, 0, c));
+      if (aliases.some(alias => value === normalizeHeader(alias))) return c;
+    }
+    return -1;
+  }
+
+  function financialDateColumns(ws) {
+    if (!ws?.['!ref']) return [];
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    let spreadsheetField = -1;
+    for (let c = range.s.c; c <= Math.min(range.e.c, 80); c += 1) {
+      if (normalizeHeader(wsValue(ws, 0, c)) === 'SPREADSHEET FIELD') spreadsheetField = c;
+    }
+    if (spreadsheetField < 0) return [];
+    const cols = [];
+    for (let c = spreadsheetField + 1; c <= range.e.c; c += 1) {
+      const serial = Number(wsValue(ws, 0, c));
+      if (Number.isFinite(serial) && serial >= 40000 && serial <= 70000) cols.push({ c, serial });
+    }
+    return cols;
+  }
+
+  function normalizeUnitCode(value) {
+    const match = String(value ?? '').match(/U\s*-\s*(\d{4})/i);
+    return match ? 'U-' + match[1] : '';
+  }
+
+  function unitDisplayNameFromRow(ws, r, maxCol) {
+    for (let c = 0; c <= maxCol; c += 1) {
+      const value = String(wsValue(ws, r, c) ?? '').trim();
+      if (/U\s*-\s*\d{4}/i.test(value) && !/^WBS:/i.test(value)) return value.replace(/\s+/g, ' ');
+    }
+    return '';
+  }
+
+  function extractFinancialSheet(workbook, sheetName) {
+    const ws = workbook.Sheets[sheetName];
+    if (!ws?.['!ref']) return null;
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    const dateCols = financialDateColumns(ws);
+    if (!dateCols.length) return null;
+
+    const budgetCol = financialHeaderIndex(ws, ['Budgeted Units','Budgeted Labor Units']);
+    const actualCol = financialHeaderIndex(ws, ['Actual Units','Actual Labor Units']);
+    const remainingCol = financialHeaderIndex(ws, ['Remaining Units','Remaining Labor Units']);
+    const units = {};
+
+    for (let r = Math.max(1, range.s.r); r <= range.e.r; r += 1) {
+      const name = unitDisplayNameFromRow(ws, r, Math.min(range.e.c, 25));
+      const code = normalizeUnitCode(name);
+      if (!code || units[code]) continue;
+
+      const total = Number(wsValue(ws, r, budgetCol));
+      const actual = Number(wsValue(ws, r, actualCol));
+      const remaining = Number(wsValue(ws, r, remainingCol));
+      const values = dateCols.map(({c}) => {
+        const n = Number(wsValue(ws, r, c));
+        return Number.isFinite(n) ? n : 0;
+      });
+
+      units[code] = {
+        code,
+        name,
+        total: Number.isFinite(total) ? total : null,
+        actual: Number.isFinite(actual) ? actual : null,
+        remaining: Number.isFinite(remaining) ? remaining : null,
+        dates: dateCols.map(x => x.serial),
+        values
+      };
+    }
+
+    return { sheetName, units };
+  }
+
+  function extractFinancialSources(workbook) {
+    const aliases = {
+      contractual: ['BLContratual'],
+      planAttack: ['BLPlanAtaq'],
+      current: ['Corrente'],
+      projected: ['Planejado BLProjetada']
+    };
+    const output = {};
+    Object.entries(aliases).forEach(([key,names]) => {
+      const found = names.find(name => workbook.SheetNames.includes(name));
+      output[key] = found ? extractFinancialSheet(workbook, found) : null;
+    });
+    return output;
+  }
+
   async function readWorkbook(file) {
     validateExtension(file);
     let workbook, buffer;
@@ -240,7 +339,8 @@
       ? XLSX.utils.sheet_to_json(workbook.Sheets[cfg.sheets.summary], { header: 1, raw: true, defval: null })
       : null;
     const curvesCharts = await extractCurvesCharts(buffer, workbook);
-    return { workbook, primary, summary, curvesCharts, headerRow };
+    const financialSources = extractFinancialSources(workbook);
+    return { workbook, primary, summary, curvesCharts, financialSources, headerRow };
   }
 
   window.ExcelReader = { readWorkbook };
