@@ -117,7 +117,6 @@
         if (!hasData) setSource('Nenhuma versão publicada no Supabase', 'warning');
         return false;
       }
-      window.PBDashboard?.importManualData?.(result.pbManual);
       applyModel(result.model, {
         name: result.publication.file_name,
         size: result.publication.file_size,
@@ -177,7 +176,7 @@
         fileName: currentFile?.name || currentPublication?.file_name || 'dataset-local',
         fileSize: Number(currentFile?.size ?? currentPublication?.file_size),
         fileLastModified: currentFile?.lastModified || currentPublication?.file_last_modified || null,
-        pbManual: window.PBDashboard?.exportManualData?.() || {}
+        pbManual: {}
       });
       currentPublication = publication;
       setSource(publicationLabel(publication), 'cloud');
@@ -264,6 +263,13 @@
   document.getElementById('fullscreen').addEventListener('click', Presentation.fullscreen);
   document.getElementById('export-pdf').addEventListener('click', PDFExport.exportPDF);
   document.addEventListener('keydown', Presentation.onKey);
+
+  window.EPC15State = {
+    hasData: () => hasData,
+    getCurrentModel: () => currentModel,
+    getCurrentFile: () => currentFile ? { ...currentFile } : null,
+    getCurrentPublication: () => currentPublication ? { ...currentPublication } : null
+  };
 
   setSource(cloudReady() ? 'Supabase pronto • abra o BI para carregar a versão publicada' : 'Supabase ainda não configurado • Excel local disponível', cloudReady() ? 'cloud' : 'neutral');
 }());
