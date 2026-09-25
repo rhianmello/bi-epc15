@@ -206,21 +206,20 @@
     event.preventDefault();
     const user = (loginUser?.value || '').trim();
     const pass = loginPass?.value || '';
-    let valid = user.toLowerCase() === 'admin' && pass === '12345678';
+    let valid = false;
 
     if (cloudReady()) {
       try {
         valid = await window.CloudSync.verifyAccess(user, pass);
       } catch (error) {
-        // Fallback local: o BI não fica bloqueado se o Supabase estiver fora do ar.
-        valid = user.toLowerCase() === 'admin' && pass === '12345678';
-        if (valid) {
-          window.CloudSync.setCredentials(user, pass);
-          setSource('Supabase indisponível • login local ativo', 'warning');
-        }
+        valid = false;
+        setSource('Não foi possível validar o acesso no Supabase', 'error');
+        console.error(error);
       }
-    } else if (valid) {
-      window.CloudSync?.setCredentials?.(user, pass);
+    } else {
+      // Compatibilidade temporária somente enquanto a integração cloud estiver desativada.
+      valid = user.toLowerCase() === 'admin' && pass === '12345678';
+      if (valid) window.CloudSync?.setCredentials?.(user, pass);
     }
 
     if (valid) {
