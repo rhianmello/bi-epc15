@@ -503,5 +503,31 @@
     renderMetrics();
   }
 
-  window.PBDashboard = { init, render };
+  function exportManualData() {
+    const activities = {};
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (key?.startsWith('epc15_pb_activities_v1::')) {
+        try { activities[key] = JSON.parse(localStorage.getItem(key) || '[]'); } catch (_) {}
+      }
+    }
+    return {
+      activities,
+      offenderNotes: readJson('epc15_pb_offender_notes_v1', {})
+    };
+  }
+
+  function importManualData(payload) {
+    if (!payload || typeof payload !== 'object') return;
+    Object.entries(payload.activities || {}).forEach(([key,value]) => {
+      if (!key.startsWith('epc15_pb_activities_v1::')) return;
+      writeJson(key, Array.isArray(value) ? value : []);
+    });
+    if (payload.offenderNotes && typeof payload.offenderNotes === 'object') {
+      writeJson('epc15_pb_offender_notes_v1', payload.offenderNotes);
+    }
+    if (model) render();
+  }
+
+  window.PBDashboard = { init, render, exportManualData, importManualData };
 }());
