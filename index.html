@@ -116,7 +116,6 @@
               <button id="publish-update" class="cloud-button cloud-button-primary" type="button" disabled>Publicar atualização</button>
             </div>
           </div>
-          <button id="select-ppt-dashboard" class="cpl-ppt-button" type="button">Inserir PowerPoint</button>
           <button id="select-excel-dashboard" class="dashboard-file-button" type="button">Selecionar Excel</button>
           <div class="topbar-meta">
             <span>Data-base</span>
@@ -165,7 +164,21 @@
           <label>UNIDADE<select id="pb-unit-filter"><option value="">Todas as Unidades</option></select></label>
           <label>FASE<select id="pb-phase-filter"><option value="">Todas as Fases</option></select></label>
           <label>DATA BASE<select id="pb-date-filter"><option>N/D</option></select></label>
-          <label>SEMANA<select id="pb-week-filter"><option>Semana N/D</option></select></label>
+          <label>SEMANA EPC-15<select id="pb-week-filter"><option>Carregando semanas...</option></select></label>
+          <div class="pb-week-actions">
+            <button id="pb-edit-week" class="pb-edit-week" type="button" title="Editar semana (senha master)">✎</button>
+            <button id="pb-use-live-excel" class="pb-week-button" type="button" disabled>Usar Excel atual</button>
+            <button id="select-ppt-dashboard" class="pb-week-button pb-week-button-ppt" type="button" disabled>Inserir PowerPoint</button>
+            <button id="pb-save-week" class="pb-week-button pb-week-button-save" type="button" disabled>Salvar semana</button>
+          </div>
+        </div>
+
+        <div class="pb-week-statusbar" aria-live="polite">
+          <div id="pb-excel-source-status" class="pb-source-box"><span>EXCEL</span><strong>Data-base N/D</strong><small>Sem arquivo</small></div>
+          <div id="pb-ppt-source-status" class="pb-source-box"><span>POWERPOINT</span><strong>Data-base N/D</strong><small>Não inserido nesta semana</small></div>
+          <div id="pb-sync-source-status" class="pb-source-box pb-source-state" data-tone="warning"><span>STATUS</span><strong>Aguardando dados</strong><small></small></div>
+          <div id="pb-week-source-status" class="pb-source-box"><span>SEMANA EPC-15</span><strong>Semana N/D</strong><small></small></div>
+          <div id="pb-save-feedback" class="pb-save-feedback"></div>
         </div>
 
         <div class="pb-layout">
@@ -251,6 +264,19 @@
             <div class="pb-modal-actions">
               <button id="pb-activity-modal-delete" class="pb-btn-danger" type="button">Excluir</button>
               <button id="pb-activity-modal-save" class="pb-btn-primary" type="button">Salvar</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="pb-master-modal" class="pb-modal hidden" role="dialog" aria-modal="true" aria-labelledby="pb-master-week-label">
+          <div class="pb-modal-card pb-master-card">
+            <div class="pb-modal-head"><h3 id="pb-master-week-label">Liberar edição da semana</h3><button id="pb-master-cancel" type="button">×</button></div>
+            <p class="pb-master-copy">A edição da Reunião de Coordenação é protegida. Semanas encerradas permanecem somente para consulta.</p>
+            <label>Senha master<input id="pb-master-password" type="password" autocomplete="off" placeholder="Digite a senha master"></label>
+            <div id="pb-master-error" class="login-error hidden">Senha master incorreta.</div>
+            <div class="pb-modal-actions pb-master-actions">
+              <button id="pb-master-cancel-2" class="pb-btn-danger" type="button" onclick="document.getElementById('pb-master-cancel').click()">Cancelar</button>
+              <button id="pb-master-submit" class="pb-btn-primary" type="button">Liberar edição</button>
             </div>
           </div>
         </div>
@@ -373,5 +399,6 @@
   <script src="js/export.js"></script>
   <script src="js/app.js"></script>
   <script src="js/coordination-deck.js"></script>
+  <script src="js/coordination-week.js"></script>
 </body>
 </html>
