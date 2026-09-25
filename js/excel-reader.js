@@ -423,6 +423,57 @@
     return output;
   }
 
+
+  function directFinanceKey(label) {
+    const n = normalizeHeader(label);
+    const map = {
+      'BLCONTRATUAL ACUM':'contractualAmount',
+      'BLCONTRATUAL X ACUM':'contractualPct',
+      'PLAN ATAQ ACUM':'planAmount',
+      'PLAN ATAQ X ACUM':'planPct',
+      'REAL ACUM':'realAmount',
+      'REAL X ACUM':'realPct',
+      'PROJETADO ACUM':'projectedAmount',
+      'PROJETADO X ACUM':'projectedPct'
+    };
+    return map[n] || null;
+  }
+
+  function financeScope(value) {
+    const raw = String(value ?? '').trim();
+    if (/^EMPREENDIMENTO$/i.test(raw)) return { key:'EMPREENDIMENTO', name:'Empreendimento' };
+    const m = raw.match(/U\s*-\s*(\d{4})/i);
+    return m ? { key:'U-' + m[1], name:raw.replace(/\s+/g,' ') } : null;
+  }
+
+  function numericSeries(row, start) {
+    return row.slice(start).map(v => typeof v === 'number' && Number.isFinite(v) ? v : null);
+  }
+
+  function extractBLPlanAtaqBlocks(workbook) {
+    const ws = workbook.Sheets.BLPlanAtaq;
+    if (!ws) return {};
+    const rows = XLSX.utils.sheet_to_json(ws, { header:1, raw:true, defval:null });
+    const out = {};
+    let dates = [];
+    let scope = null;
+    for (let r=0;r<rows.length;r+=1) {
+      const row = rows[r] || [];
+      const colT = row[19];
+      const colU = row[20];
+      if (normalizeHeader(colU) === 'DIA') dates = numericSeries(row,21);
+      const nextScope = financeScope(colT);
+      if (nextScope) scope = nextScope;
+      const key = directFinanceKey(colU);
+      if (!scope || !key || !dates.length) continue;
+      out[scope.key] = out[scope.key] || { code:scope.key, name:scope.name, sourceRows:{}, series:{} };
+      out[scope.key].name = scope.name;
+      out[scope.key].sourceRows[key] = r + 1;
+      out[scope.key].series[key] = { dates:[...dates], values:numericSeries(row,21) };
+    }
+    return out;
+  }
+
   async function readWorkbook(file) {
     validateExtension(file);
     let workbook, buffer;
