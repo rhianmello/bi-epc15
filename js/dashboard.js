@@ -155,7 +155,13 @@
     const sourceEl = document.getElementById('unit-curve-source');
     if (title) title.textContent = titleCaseUnit(unit.rawName).toUpperCase();
     if (dateEl) dateEl.textContent = 'Data-base: ' + date(model.dataBase);
-    if (sourceEl) sourceEl.textContent = curve?.source === 'financial-sheets' ? 'Fonte: BLContratual + BLPlanAtaq + Corrente + BLProjetada' : 'Fonte legada: CURVAS';
+    if (sourceEl) {
+      sourceEl.textContent = curve?.source === 'blplanataq-direct'
+        ? 'Fonte: BLPlanAtaq • linhas % Acum (T/U/V+)'
+        : curve?.source === 'financial-sheets'
+          ? 'Fonte alternativa: abas financeiras'
+          : 'Fonte legada: CURVAS';
+    }
     if (!summaryEl) return;
     const s = curve?.summary;
     if (!s) {
