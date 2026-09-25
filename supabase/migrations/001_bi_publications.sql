@@ -85,9 +85,10 @@ language plpgsql
 stable
 security definer
 set search_path = public, extensions
-as $$
+as $
 declare
   v_row public.bi_publications%rowtype;
+  v_dataset_type text := coalesce(nullif(p_dataset_type,''),'epc15');
 begin
   if not public.bi_access_ok(p_username, p_password) then
     raise exception 'Acesso negado' using errcode = '42501';
@@ -95,9 +96,9 @@ begin
 
   select *
     into v_row
-    from public.bi_publications
-   where dataset_type = p_dataset_type
-     and is_current
+    from public.bi_publications p
+   where p.dataset_type = v_dataset_type
+     and p.is_current
    order by published_at desc
    limit 1;
 
@@ -208,7 +209,9 @@ language plpgsql
 stable
 security definer
 set search_path = public, extensions
-as $$
+as $
+declare
+  v_dataset_type text := coalesce(nullif(p_dataset_type,''),'epc15');
 begin
   if not public.bi_access_ok(p_username, p_password) then
     raise exception 'Acesso negado' using errcode = '42501';
@@ -218,11 +221,16 @@ begin
   select p.id, p.version_no, p.file_name, p.data_base, p.schema_version,
          p.is_current, p.published_by, p.published_at
     from public.bi_publications p
-   where p.dataset_type = p_dataset_type
+   where p.dataset_type = v_dataset_type
    order by p.published_at desc
    limit greatest(1, least(coalesce(p_limit,10),50));
 end;
 $$;
+
+revoke all on function public.verify_bi_access(text,text) from public;
+revoke all on function public.get_current_bi_snapshot(text,text,text) from public;
+revoke all on function public.publish_bi_snapshot(text,text,text,text,bigint,timestamptz,date,text,jsonb,jsonb) from public;
+revoke all on function public.list_bi_publications(text,text,text,integer) from public;
 
 grant execute on function public.verify_bi_access(text,text) to anon, authenticated;
 grant execute on function public.get_current_bi_snapshot(text,text,text) to anon, authenticated;
