@@ -228,25 +228,7 @@
         <div id="unit-kpis" class="kpi-grid"></div>
 
         <div class="unit-executive-grid">
-          <article class="panel unit-phase-chart-panel">
-            <div class="panel-heading"><div><p class="eyebrow">AVANÇO FÍSICO</p><h3>Previsto x realizado por fase</h3></div></div>
-            <div class="chart-wrap tall"><canvas id="phase-chart"></canvas></div>
-          </article>
-
-          <article class="panel delay-panel">
-            <div class="panel-heading">
-              <div><p class="eyebrow">ITENS EM ATRASO</p><h3>Ofensores da seleção</h3></div>
-              <span id="delay-count" class="delay-count">0 em atraso</span>
-            </div>
-            <div id="delay-list" class="delay-list"></div>
-          </article>
-
-          <article class="panel phase-summary-panel">
-            <div class="panel-heading"><div><p class="eyebrow">DESEMPENHO</p><h3>Fases da unidade</h3></div></div>
-            <div class="table-wrap compact"><table><thead><tr><th>Fase</th><th>Prev.</th><th>Real.</th><th>Desvio</th><th>Status</th></tr></thead><tbody id="phase-table"></tbody></table></div>
-          </article>
-
-          <article class="panel curve-panel">
+<article class="panel curve-panel">
             <div class="financial-title">
               <div class="financial-logo"><b>CPL</b><span>EPC-15</span></div>
               <div class="financial-title-copy">
@@ -260,6 +242,24 @@
               <canvas id="unit-curve-chart"></canvas>
               <div id="unit-curve-empty" class="curve-empty">Não foi possível montar a curva financeira desta unidade a partir das abas-fonte.</div>
             </div>
+          </article>
+
+<article class="panel unit-phase-chart-panel">
+            <div class="panel-heading"><div><p class="eyebrow">AVANÇO FÍSICO</p><h3>Previsto x realizado por fase</h3></div></div>
+            <div class="chart-wrap tall"><canvas id="phase-chart"></canvas></div>
+          </article>
+
+<article class="panel phase-summary-panel">
+            <div class="panel-heading"><div><p class="eyebrow">DESEMPENHO</p><h3>Fases da unidade</h3></div></div>
+            <div class="table-wrap compact"><table><thead><tr><th>Fase</th><th>Prev.</th><th>Real.</th><th>Desvio</th><th>Status</th></tr></thead><tbody id="phase-table"></tbody></table></div>
+          </article>
+
+<article class="panel delay-panel">
+            <div class="panel-heading">
+              <div><p class="eyebrow">ITENS EM ATRASO</p><h3>Ofensores da seleção</h3></div>
+              <span id="delay-count" class="delay-count">0 em atraso</span>
+            </div>
+            <div id="delay-list" class="delay-list"></div>
           </article>
         </div>
 
