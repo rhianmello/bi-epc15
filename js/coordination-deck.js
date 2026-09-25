@@ -332,123 +332,132 @@
     return Number.isFinite(v) ? new Intl.NumberFormat('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:2}).format(v*100)+'%' : '—';
   }
 
-  function ensurePanel() {
-    const page = document.getElementById('page-pb');
-    if (!page || document.getElementById('coordination-deck-panel')) return;
-    const panel = document.createElement('article');
-    panel.id = 'coordination-deck-panel';
-    panel.className = 'coordination-deck-panel hidden';
-    panel.innerHTML =
-      '<div class="coordination-deck-toolbar">' +
-        '<div><p class="eyebrow">BASE DA APRESENTAÇÃO</p><h3>PowerPoint estruturado</h3><small id="coordination-deck-file"></small></div>' +
-        '<div class="coordination-deck-actions">' +
-          '<button type="button" id="coordination-prev">← Anterior</button>' +
-          '<span id="coordination-counter">0 / 0</span>' +
-          '<button type="button" id="coordination-next">Próxima →</button>' +
-          '<button type="button" id="coordination-download">Baixar página</button>' +
-          '<button type="button" id="coordination-clear">Limpar PPT</button>' +
-        '</div>' +
-      '</div>' +
-      '<div id="coordination-deck-warning" class="coordination-deck-warning hidden"></div>' +
-      '<div id="coordination-deck-page" class="coordination-deck-page"></div>';
-    const layout = page.querySelector('.pb-layout');
-    layout?.insertAdjacentElement('afterend', panel);
-    document.getElementById('coordination-prev')?.addEventListener('click',()=>{pageIndex--;render();});
-    document.getElementById('coordination-next')?.addEventListener('click',()=>{pageIndex++;render();});
-    document.getElementById('coordination-clear')?.addEventListener('click',clear);
-    document.getElementById('coordination-download')?.addEventListener('click',downloadCurrent);
+  function metricRowsFor(unit, phase) {
+    const data = read();
+    if (!data?.slides?.length) return [];
+    const rows = [];
+    data.slides.forEach(slide => {
+      if (!slide.unitCode) return;
+      if (unit && slide.unitCode !== unit) return;
+      if (phase && !samePhase(slide.phase, phase)) return;
+      (slide.disciplines || []).forEach(item => {
+        if (!Number.isFinite(item.planned) && !Number.isFinite(item.actual)) return;
+        rows.push({
+          topic:item.name,
+          planned:item.planned,
+          actual:item.actual,
+          variance:Number.isFinite(item.planned) && Number.isFinite(item.actual) ? item.actual-item.planned : null,
+          unitCode:slide.unitCode,
+          unitName:slide.unitName,
+          phase:slide.phase,
+          sourceSlide:slide.number,
+          kind:'discipline'
+        });
+      });
+      (slide.deliveries || []).forEach(item => {
+        if (!Number.isFinite(item.planned) && !Number.isFinite(item.actual)) return;
+        rows.push({
+          topic:item.name,
+          planned:item.planned,
+          actual:item.actual,
+          variance:Number.isFinite(item.variance) ? item.variance :
+            (Number.isFinite(item.planned) && Number.isFinite(item.actual) ? item.actual-item.planned : null),
+          status:item.status || '',
+          unitCode:slide.unitCode,
+          unitName:slide.unitName,
+          phase:slide.phase,
+          sourceSlide:slide.number,
+          kind:'delivery'
+        });
+      });
+    });
+    const seen = new Set();
+    return rows.filter(row => {
+      const key=[row.unitCode,norm(row.phase),norm(row.topic),row.kind].join('|');
+      if(seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 
-  function miniTable(title, rows, columns) {
-    if (!rows?.length) return '';
-    return '<section class="coordination-block"><h4>'+esc(title)+'</h4><div class="coordination-table-wrap"><table><thead><tr>'+
-      columns.map(c=>'<th>'+esc(c.label)+'</th>').join('')+'</tr></thead><tbody>'+
-      rows.map(r=>'<tr>'+columns.map(c=>'<td>'+esc(c.format?c.format(r[c.key]):r[c.key])+'</td>').join('')+'</tr>').join('')+
-      '</tbody></table></div></section>';
+  function actionsFor(unit, phase) {
+    const data = read();
+    if (!data?.slides?.length) return [];
+    const metrics = metricRowsFor(unit,phase);
+    const rows = [];
+    data.slides.forEach(slide => {
+      if (!slide.unitCode) return;
+      if (unit && slide.unitCode !== unit) return;
+      if (phase && !samePhase(slide.phase,phase)) return;
+      (slide.actions || []).forEach(action => {
+        const nt=norm(action.topic);
+        const metric=metrics.find(m => m.unitCode===slide.unitCode && samePhase(m.phase,slide.phase) &&
+          (norm(m.topic)===nt || norm(m.topic).includes(nt) || nt.includes(norm(m.topic))));
+        rows.push({
+          ...action,
+          unitCode:slide.unitCode,
+          unitName:slide.unitName,
+          phase:slide.phase,
+          dataBase:slide.dataBase,
+          sourceSlide:slide.number,
+          planned:metric?.planned ?? null,
+          actual:metric?.actual ?? null,
+          variance:metric?.variance ?? null
+        });
+      });
+    });
+    const seen = new Set();
+    return rows.filter(row => {
+      const key=[row.unitCode,norm(row.phase),norm(row.topic),norm(row.cause),norm(row.plan)].join('|');
+      if(seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 
-  function actionCards(actions) {
-    if (!actions?.length) return '';
-    return '<section class="coordination-block"><h4>Causa raiz × Plano de recuperação</h4><div class="coordination-action-list">'+
-      actions.map(a=>'<article class="coordination-action-card"><strong>'+esc(a.topic)+'</strong><div><span>CAUSA RAIZ</span><p>'+esc(a.cause||'Não informado no PPT')+'</p></div><div><span>PLANO DE RECUPERAÇÃO</span><p>'+esc(a.plan||'Não informado no PPT')+'</p></div><small>Slide '+a.sourceSlide+'</small></article>').join('')+
-      '</div></section>';
+  function metricsFor(unit, phase) {
+    return metricRowsFor(unit,phase)
+      .filter(row => Number.isFinite(row.planned) || Number.isFinite(row.actual))
+      .sort((a,b) => {
+        const av=Number.isFinite(a.variance)?a.variance:0;
+        const bv=Number.isFinite(b.variance)?b.variance:0;
+        return av-bv;
+      });
   }
 
-  function renderSlide(slide) {
-    const header = (slide.unitCode ? esc(slide.unitCode + (slide.unitName?' — '+slide.unitName:'')) : 'CONTRATO EPC-15') +
-      (slide.phase ? '<span>'+esc(slide.phase)+'</span>' : '');
-    const metrics = [Number.isFinite(slide.planned)?['Previsto',fmtPct(slide.planned)]:null,Number.isFinite(slide.actual)?['Realizado',fmtPct(slide.actual)]:null,Number.isFinite(slide.variance)?['Desvio',fmtPct(slide.variance)]:null].filter(Boolean);
-    let body = '';
-    body += miniTable('Entregas de projeto',slide.deliveries,[
-      {key:'name',label:'Entrega'},{key:'planned',label:'Previsto',format:fmtPct},{key:'actual',label:'Realizado',format:fmtPct},{key:'variance',label:'Desvio',format:fmtPct},{key:'status',label:'Situação'}
-    ]);
-    body += miniTable('Disciplinas / pacotes',slide.disciplines,[
-      {key:'name',label:'Disciplina'},{key:'planned',label:'Previsto',format:fmtPct},{key:'actual',label:'Realizado',format:fmtPct}
-    ]);
-    body += miniTable('Equipamentos e materiais',slide.equipment,[
-      {key:'name',label:'Equipamento / material'},{key:'application',label:'Aplicação'},{key:'delivery',label:'Entrega prevista'},{key:'status',label:'Status'}
-    ]);
-    body += actionCards(slide.actions);
-    if (!body) {
-      const concise = slide.rawText.split('\n').filter(Boolean).slice(0,22).join('\n');
-      body = '<section class="coordination-block coordination-raw"><h4>Conteúdo identificado</h4><p>'+esc(concise)+'</p></section>';
-    }
-    return '<header class="coordination-page-head"><div><small>SLIDE '+slide.number+'</small><h3>'+header+'</h3></div><div class="coordination-page-meta">'+
-      (slide.value?'<strong>'+esc(slide.value)+'</strong>':'')+(slide.dataBase?'<span>PPT: '+esc(slide.dataBase)+'</span>':'')+'</div></header>'+
-      (metrics.length?'<div class="coordination-page-kpis">'+metrics.map(m=>'<div><span>'+m[0]+'</span><strong>'+m[1]+'</strong></div>').join('')+'</div>':'')+
-      '<div class="coordination-page-body">'+body+'</div>';
+  function lookaheadFor(unit, phase) {
+    const rows = actionsFor(unit,phase).filter(row => clean(row.plan));
+    const seen = new Set();
+    return rows.filter(row => {
+      const key=[row.unitCode,norm(row.phase),norm(row.topic),norm(row.plan)].join('|');
+      if(seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  function status() {
+    const data=read();
+    if(!data?.slides?.length) return null;
+    const dates=[...new Set(data.slides.map(s=>s.dataBase).filter(Boolean))];
+    return {
+      fileName:data.fileName || '',
+      importedAt:data.importedAt || '',
+      slides:data.slides.length,
+      dataBase:dates.length===1?dates[0]:(dates[0]||'')
+    };
+  }
+
+  function importedAfter(timestamp) {
+    const data=read();
+    const imported=Date.parse(data?.importedAt||'');
+    const edited=Number(timestamp)||0;
+    return Number.isFinite(imported) && imported > edited;
   }
 
   function render() {
-    ensurePanel();
-    const panel = document.getElementById('coordination-deck-panel');
-    const host = document.getElementById('coordination-deck-page');
-    const counter = document.getElementById('coordination-counter');
-    const file = document.getElementById('coordination-deck-file');
-    const warning = document.getElementById('coordination-deck-warning');
-    if (!panel || !host) return;
-    const data = read();
-    if (!data?.slides?.length) {
-      panel.classList.add('hidden');
-      host.innerHTML='';
-      const legacy = (()=>{try{return JSON.parse(localStorage.getItem(LEGACY_KEY)||'null')}catch(_){return null}})();
-      if (legacy?.slides?.length) {
-        panel.classList.remove('hidden');
-        host.innerHTML='<div class="coordination-empty">Existe uma importação antiga do PowerPoint. Reimporte o arquivo para mapear Unidade, Fase, Causa Raiz e Plano de Recuperação.</div>';
-      }
-      return;
-    }
-    panel.classList.remove('hidden');
-    if (file) file.textContent=(data.fileName||'PowerPoint')+' • '+data.slides.length+' slides extraídos e classificados';
-    const s=scope();
-    const pages=pagesFor(s.unit,s.phase);
-    if (!pages.length) {
-      pageIndex=0;
-      if(counter) counter.textContent='0 / 0';
-      host.innerHTML='<div class="coordination-empty">Nenhum slide do PowerPoint corresponde ao filtro atual. Selecione outra Unidade/Fase.</div>';
-      return;
-    }
-    pageIndex=((pageIndex%pages.length)+pages.length)%pages.length;
-    const slide=pages[pageIndex];
-    if(counter) counter.textContent=(pageIndex+1)+' / '+pages.length+' • slide '+slide.number;
-    host.innerHTML=renderSlide(slide);
-    const currentBiDate=document.getElementById('pb-date-filter')?.selectedOptions?.[0]?.textContent || '';
-    if (warning) {
-      const mismatch=slide.dataBase && currentBiDate && currentBiDate!=='N/D' && !currentBiDate.includes(slide.dataBase);
-      warning.classList.toggle('hidden',!mismatch);
-      warning.textContent=mismatch?'Atenção: o PowerPoint é de '+slide.dataBase+' e o BI está em '+currentBiDate+'. Os textos abaixo são históricos até você importar uma apresentação atualizada.':'';
-    }
-  }
-
-  async function downloadCurrent() {
-    const target=document.getElementById('coordination-deck-page');
-    if (!target || !window.html2canvas) return;
-    const canvas=await html2canvas(target,{backgroundColor:'#07111f',scale:2,useCORS:true});
-    const link=document.createElement('a');
-    const s=scope();
-    link.download='reuniao-coordenacao_'+(s.unit||'contrato')+'_'+(s.phase?norm(s.phase).toLowerCase().replace(/\s+/g,'-'):'geral')+'.png';
-    link.href=canvas.toDataURL('image/png');
-    link.click();
+    // O PowerPoint agora alimenta diretamente os cards existentes da Reunião de Coordenação.
+    // Não existe mais um painel de texto separado no fim da página.
   }
 
   async function importFile(file) {
@@ -463,7 +472,6 @@
   function install() {
     if (installed) return;
     installed=true;
-    ensurePanel();
     const input=document.getElementById('ppt-input');
     const button=document.getElementById('select-ppt-dashboard');
     button?.addEventListener('click',()=>input?.click());
@@ -486,10 +494,12 @@
       }
     });
     document.addEventListener('coordinationdeckchange',()=>window.PBDashboard?.render?.());
-    render();
   }
 
-  window.CoordinationDeck={install,render,parse,read,clear,exportData,importData,pagesFor,actionsFor,matchAction};
+  window.CoordinationDeck={
+    install,render,parse,read,clear,exportData,importData,
+    pagesFor,actionsFor,metricsFor,lookaheadFor,matchAction,status,importedAfter
+  };
   window.addEventListener('DOMContentLoaded',install);
-  window.addEventListener('load',()=>{install();render();});
+  window.addEventListener('load',install);
 }());
