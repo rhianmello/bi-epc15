@@ -1,6 +1,8 @@
 (function () {
   let model = null;
   let fileName = '';
+  let liveModel = null;
+  let liveFileName = '';
   let paretoChart = null;
   let currentEditId = null;
   let initialized = false;
@@ -107,17 +109,24 @@
   function populateDateWeek() {
     const dateEl = document.getElementById('pb-date-filter');
     const weekEl = document.getElementById('pb-week-filter');
-    const week = isoWeek(model.dataBase);
     if (dateEl) dateEl.innerHTML = '<option value="current">' + esc(model.dataBase ? new Intl.DateTimeFormat('pt-BR',{timeZone:'UTC'}).format(model.dataBase) : 'N/D') + '</option>';
-    if (weekEl) weekEl.innerHTML = '<option value="' + (week || '') + '">' + (week ? 'Semana ' + week : 'Semana N/D') + '</option>';
+    if (weekEl) {
+      if (window.CoordinationWeek?.fillWeekOptions) window.CoordinationWeek.fillWeekOptions(weekEl);
+      else {
+        const projectStart = Date.UTC(2026,2,29);
+        const now = model.dataBase instanceof Date ? model.dataBase.getTime() : Date.now();
+        const week = Math.max(1, Math.min(134, Math.floor((now-projectStart)/604800000)+1));
+        weekEl.innerHTML = '<option value="' + week + '">Semana ' + week + '</option>';
+      }
+    }
   }
 
   function renderContext(summary) {
     const s = selection();
     const level = s.phase ? 'WBS Nível 2' : s.unit ? 'WBS Nível 1' : 'WBS Nível 0';
-    const week = isoWeek(model.dataBase);
+    const week = Number(s.week) || window.CoordinationWeek?.getSelectedWeek?.() || null;
     document.getElementById('pb-wbs').textContent = level;
-    document.getElementById('pb-context-date').textContent = 'Data Base: ' + dateShort(model.dataBase) + (week ? ' • Sem. ' + week : '');
+    document.getElementById('pb-context-date').textContent = 'Data Base: ' + dateShort(model.dataBase) + (week ? ' • Sem. EPC-15 ' + week : '');
     const deckStatus = window.CoordinationDeck?.status?.();
     document.getElementById('pb-file-info').textContent =
       (fileName ? 'Excel: ' + fileName : '') +
@@ -241,8 +250,17 @@
     try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {}
   }
 
+  function canEdit() {
+    return Boolean(window.CoordinationWeek?.canEdit?.());
+  }
+
+  function offenderNotesKey(weekNo) {
+    const week = Number(weekNo || selection().week || window.CoordinationWeek?.getSelectedWeek?.());
+    return 'epc15_pb_offender_notes_v2::W' + (Number.isFinite(week) && week > 0 ? week : 'NOW');
+  }
+
   function offenderNotes() {
-    return readJson('epc15_pb_offender_notes_v1', {});
+    return readJson(offenderNotesKey(), {});
   }
 
   function offenderClass(row) {
@@ -302,6 +320,7 @@
       document.getElementById('pb-offender-count').textContent = ranked.length + (ranked.length===1?' Ofensor':' Ofensores');
       document.getElementById('pb-cpm-note').textContent = 'Causa/recuperação do PPT • desvio do BI quando houver correspondência';
 
+      const disabled = canEdit() ? '' : ' disabled';
       host.innerHTML = ranked.map((item,index) => {
         const action=item.action;
         const id='ppt|' + [action.unitCode,action.phase,action.topic].map(v=>String(v||'')).join('|');
@@ -323,8 +342,8 @@
             '<span class="pb-offender-tag">' + cls.label + '</span>' +
           '</div>' +
           '<div class="pb-offender-body">' +
-            '<label><span>CAUSA RAIZ</span><textarea data-offender-field="cause" placeholder="Não informado no PowerPoint">' + esc(cause) + '</textarea></label>' +
-            '<label><span>PLANO DE RECUPERAÇÃO</span><textarea data-offender-field="mitigation" placeholder="Não informado no PowerPoint">' + esc(recovery) + '</textarea></label>' +
+            '<label><span>CAUSA RAIZ</span><textarea data-offender-field="cause"' + disabled + ' placeholder="Não informado no PowerPoint">' + esc(cause) + '</textarea></label>' +
+            '<label><span>PLANO DE RECUPERAÇÃO</span><textarea data-offender-field="mitigation"' + disabled + ' placeholder="Não informado no PowerPoint">' + esc(recovery) + '</textarea></label>' +
           '</div>' +
         '</article>';
       }).join('');
@@ -345,6 +364,7 @@
       host.innerHTML = '<div class="pb-empty-light">Nenhum item com desvio negativo para esta seleção.</div>';
       return;
     }
+    const disabled = canEdit() ? '' : ' disabled';
     host.innerHTML = unique.map((row,index) => {
       const id = offenderId(row);
       const note = notes[id] || {};
@@ -357,8 +377,8 @@
           '<span class="pb-offender-tag">' + cls.label + '</span>' +
         '</div>' +
         '<div class="pb-offender-body">' +
-          '<label><span>CAUSA RAIZ</span><textarea data-offender-field="cause" placeholder="Digite a causa raiz...">' + esc(note.cause || '') + '</textarea></label>' +
-          '<label><span>PLANO DE RECUPERAÇÃO</span><textarea data-offender-field="mitigation" placeholder="Digite o plano de recuperação...">' + esc(note.mitigation || '') + '</textarea></label>' +
+          '<label><span>CAUSA RAIZ</span><textarea data-offender-field="cause"' + disabled + ' placeholder="Digite a causa raiz...">' + esc(note.cause || '') + '</textarea></label>' +
+          '<label><span>PLANO DE RECUPERAÇÃO</span><textarea data-offender-field="mitigation"' + disabled + ' placeholder="Digite o plano de recuperação...">' + esc(note.mitigation || '') + '</textarea></label>' +
         '</div>' +
       '</article>';
     }).join('');
@@ -465,6 +485,11 @@
   }
 
   function renderActivities() {
+    const editable = canEdit();
+    const quick = document.getElementById('pb-activity-quick');
+    const add = document.getElementById('pb-activity-add');
+    if (quick) quick.disabled = !editable;
+    if (add) add.disabled = !editable;
     const manual = activities();
     const ppt = pptLookaheadRows().slice(0,6);
     const total = ppt.length + manual.length;
@@ -490,11 +515,11 @@
         '<span class="pb-activity-icon">' + meta.icon + '</span>' +
         '<div class="pb-activity-copy"><strong>' + esc(item.title) + '</strong><span>' + esc(item.description || '') + '</span></div>' +
         '<span class="pb-activity-status">' + esc(statusLabel(item)) + '</span>' +
-        '<div class="pb-activity-actions">' +
+        (editable ? '<div class="pb-activity-actions">' +
           '<button type="button" data-activity-move="-1" data-activity-id="' + esc(item.id) + '" title="Subir">↑</button>' +
           '<button type="button" data-activity-move="1" data-activity-id="' + esc(item.id) + '" title="Descer">↓</button>' +
           '<button type="button" data-activity-edit="' + esc(item.id) + '" title="Editar">✎</button>' +
-        '</div>' +
+        '</div>' : '<span class="pb-readonly-chip">Somente leitura</span>') +
       '</article>';
     }).join('');
 
@@ -502,6 +527,7 @@
   }
 
   function addQuickActivity() {
+    if (!canEdit()) return;
     const input = document.getElementById('pb-activity-quick');
     const title = input.value.trim();
     if (!title) return;
@@ -513,6 +539,7 @@
   }
 
   function openActivityModal(id) {
+    if (!canEdit()) return;
     const items = activities();
     const item = items.find(x => x.id === id);
     if (!item) return;
@@ -530,6 +557,7 @@
   }
 
   function saveActivityModal() {
+    if (!canEdit()) return;
     if (!currentEditId) return;
     const items = activities();
     const item = items.find(x => x.id === currentEditId);
@@ -545,6 +573,7 @@
   }
 
   function deleteActivityModal() {
+    if (!canEdit()) return;
     if (!currentEditId) return;
     saveActivities(activities().filter(x => x.id !== currentEditId));
     closeActivityModal();
@@ -552,6 +581,7 @@
   }
 
   function moveActivity(id, direction) {
+    if (!canEdit()) return;
     const items = activities();
     const i = items.findIndex(x => x.id === id);
     const j = i + Number(direction);
@@ -562,6 +592,7 @@
   }
 
   function saveOffenderField(target) {
+    if (!canEdit()) return;
     const card = target.closest('[data-offender-id]');
     if (!card) return;
     const id = card.dataset.offenderId;
@@ -569,7 +600,7 @@
     notes[id] = notes[id] || {};
     notes[id][target.dataset.offenderField] = target.value.trim();
     notes[id]._editedAt = Date.now();
-    writeJson('epc15_pb_offender_notes_v1', notes);
+    writeJson(offenderNotesKey(), notes);
   }
 
   function bind() {
@@ -598,12 +629,45 @@
   }
 
   function init(data, importedFileName) {
-    model = data;
-    fileName = importedFileName || '';
+    liveModel = data;
+    liveFileName = importedFileName || '';
+    if (!window.CoordinationWeek?.hasActiveSnapshot?.()) {
+      model = data;
+      fileName = liveFileName;
+    }
     populateUnitFilter();
     populatePhaseFilter();
     populateDateWeek();
     bind();
+  }
+
+  function useSnapshot(data, importedFileName) {
+    if (!data) return;
+    model = data;
+    fileName = importedFileName || 'Semana salva';
+    populateUnitFilter();
+    populatePhaseFilter();
+    populateDateWeek();
+    render();
+  }
+
+  function useLive() {
+    if (!liveModel) return;
+    model = liveModel;
+    fileName = liveFileName;
+    populateUnitFilter();
+    populatePhaseFilter();
+    populateDateWeek();
+    render();
+  }
+
+  function getViewInfo() {
+    return {
+      fileName,
+      dataBase: model?.dataBase || null,
+      liveFileName,
+      liveDataBase: liveModel?.dataBase || null
+    };
   }
 
   function render() {
@@ -614,35 +678,48 @@
     renderOffenders();
     renderActivities();
     renderMetrics();
+    window.CoordinationWeek?.refreshStatus?.();
   }
 
-  function exportManualData() {
+  function exportWeekData(weekNo) {
+    const week = Number(weekNo);
     const activities = {};
     for (let i = 0; i < localStorage.length; i += 1) {
       const key = localStorage.key(i);
-      if (key?.startsWith('epc15_pb_activities_v1::')) {
+      if (key?.startsWith('epc15_pb_activities_v1::') && key.endsWith('::' + week)) {
         try { activities[key] = JSON.parse(localStorage.getItem(key) || '[]'); } catch (_) {}
       }
     }
     return {
       activities,
-      offenderNotes: readJson('epc15_pb_offender_notes_v1', {}),
-      coordinationDeck: window.CoordinationDeck?.exportData?.() || null
+      offenderNotes: readJson(offenderNotesKey(week), {})
     };
   }
 
-  function importManualData(payload) {
+  function importWeekData(payload, weekNo) {
     if (!payload || typeof payload !== 'object') return;
     Object.entries(payload.activities || {}).forEach(([key,value]) => {
       if (!key.startsWith('epc15_pb_activities_v1::')) return;
       writeJson(key, Array.isArray(value) ? value : []);
     });
     if (payload.offenderNotes && typeof payload.offenderNotes === 'object') {
-      writeJson('epc15_pb_offender_notes_v1', payload.offenderNotes);
+      writeJson(offenderNotesKey(weekNo), payload.offenderNotes);
     }
-    if (payload.coordinationDeck) window.CoordinationDeck?.importData?.(payload.coordinationDeck);
     if (model) render();
   }
 
-  window.PBDashboard = { init, render, exportManualData, importManualData };
+  function exportManualData() {
+    // A publicação geral do BI é exclusivamente do Excel.
+    // Conteúdo de Reunião de Coordenação é salvo por semana.
+    return {};
+  }
+
+  function importManualData() {
+    // Mantido por compatibilidade; dados semanais são carregados pelo CoordinationWeek.
+  }
+
+  window.PBDashboard = {
+    init, render, useSnapshot, useLive, getViewInfo,
+    exportWeekData, importWeekData, exportManualData, importManualData
+  };
 }());
