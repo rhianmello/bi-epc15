@@ -107,6 +107,53 @@
     return Array.isArray(data) ? data : [];
   }
 
+  async function listCoordinationWeeks() {
+    const data = await rpc('list_coordination_weeks', {});
+    return Array.isArray(data) ? data : [];
+  }
+
+  async function verifyCoordinationMaster(masterPassword, weekNo) {
+    const data = await rpc('verify_coordination_master', {
+      p_master_password: String(masterPassword || ''),
+      p_week_no: Number(weekNo)
+    });
+    return typeof data === 'string' ? JSON.parse(data) : data;
+  }
+
+  async function loadCoordinationWeek(weekNo) {
+    const data = await rpc('get_coordination_week', { p_week_no:Number(weekNo) });
+    const result = typeof data === 'string' ? JSON.parse(data) : data;
+    if (result?.snapshot?.dataset?.model) {
+      result.snapshot.dataset.model = reviveModel(result.snapshot.dataset.model);
+    }
+    return result;
+  }
+
+  async function saveCoordinationWeek(payload) {
+    if (!payload?.model) throw new Error('Nenhum Excel carregado para salvar nesta semana.');
+    const dataBase = payload.model.dataBase instanceof Date && !Number.isNaN(payload.model.dataBase.valueOf())
+      ? payload.model.dataBase.toISOString().slice(0,10)
+      : null;
+    const dataset = {
+      schema_version: 'epc15_coordination_week_v1',
+      generated_at: new Date().toISOString(),
+      model: payload.model
+    };
+    const data = await rpc('save_coordination_week', {
+      p_master_password: String(payload.masterPassword || ''),
+      p_week_no: Number(payload.weekNo),
+      p_excel_file_name: payload.excelFileName || null,
+      p_excel_data_base: dataBase,
+      p_ppt_file_name: payload.pptFileName || null,
+      p_ppt_data_base: payload.pptDataBase || null,
+      p_schema_version: 'epc15_coordination_week_v1',
+      p_dataset: dataset,
+      p_pb_manual: payload.pbManual || {},
+      p_coordination_deck: payload.coordinationDeck || {}
+    });
+    return typeof data === 'string' ? JSON.parse(data) : data;
+  }
+
   window.CloudSync = {
     ready,
     setCredentials,
@@ -116,6 +163,10 @@
     loadCurrent,
     publish,
     history,
+    listCoordinationWeeks,
+    verifyCoordinationMaster,
+    loadCoordinationWeek,
+    saveCoordinationWeek,
     schemaVersion: cfg.schemaVersion || 'epc15_snapshot_v1'
   };
 }());
