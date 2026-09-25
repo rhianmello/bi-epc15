@@ -94,15 +94,15 @@
         animation:{duration:250},
         interaction:{mode:'index',intersect:false},
         plugins:{
-          legend:{position:'top',align:'start',labels:{color:'#172033',usePointStyle:false,boxWidth:28,font:{size:10,weight:'600'}}},
+          legend:{position:'top',align:'start',labels:{color:'#cfe2f5',usePointStyle:false,boxWidth:28,font:{size:10,weight:'600'}}},
           tooltip:{callbacks:{label:ctx => {
             const v=ctx.parsed.y;
             return Number.isFinite(v) ? ctx.dataset.label + ': ' + v.toLocaleString('pt-BR',{maximumFractionDigits:2}) + (asPercent?'%':'') : ctx.dataset.label + ': —';
           }}}
         },
         scales:{
-          x:{grid:{color:'rgba(255,255,255,.75)'},ticks:{color:'#111827',maxRotation:90,minRotation:90,autoSkip:true,maxTicksLimit:36,font:{size:8}}},
-          y:{beginAtZero:true,min:0,max:asPercent?100:undefined,grid:{color:'rgba(255,255,255,.92)'},ticks:{color:'#111827',font:{size:9},callback:v=>asPercent?Number(v).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%':v}}
+          x:{grid:{color:'rgba(148,163,184,.15)'},ticks:{color:'#8fa4bd',maxRotation:90,minRotation:90,autoSkip:true,maxTicksLimit:36,font:{size:8}}},
+          y:{beginAtZero:true,min:0,max:asPercent?100:undefined,grid:{color:'rgba(148,163,184,.15)'},ticks:{color:'#8fa4bd',font:{size:9},callback:v=>asPercent?Number(v).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%':v}}
         }
       }
     });
