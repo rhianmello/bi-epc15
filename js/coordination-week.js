@@ -7,6 +7,7 @@
   let masterPassword = '';
   let currentSnapshot = null;
   let activeSnapshot = false;
+  let loadedWeekNo = null;
   let usingLiveDraft = false;
   let cloudWeeksLoaded = false;
   let loadingWeeks = false;
@@ -98,7 +99,10 @@
     const target = weekByNo(previous) ? previous : currentProjectWeek();
     select.value = String(target);
     selectedWeek = target;
-    queueMicrotask(() => ensureCloudWeeks());
+    queueMicrotask(() => {
+      ensureCloudWeeks();
+      if (cloudWeeksLoaded && window.EPC15State?.hasData?.() && Number(loadedWeekNo) !== Number(target)) loadWeek(target);
+    });
   }
 
   async function ensureCloudWeeks(force=false) {
@@ -190,6 +194,7 @@
 
   async function loadWeek(weekNo) {
     selectedWeek=Number(weekNo);
+    loadedWeekNo=selectedWeek;
     unlockedWeek=null;
     masterPassword='';
     usingLiveDraft=false;
