@@ -97,3 +97,24 @@
 .curve-panel .curve-canvas-shell{height:360px;margin:0 12px 12px;padding:8px;background:#e9e9e9;border-radius:0}
 .curve-panel .curve-empty{background:#e9e9e9}
 @media(max-width:760px){.financial-title{grid-template-columns:50px 1fr}.financial-title-meta{grid-column:1/-1;text-align:center;max-width:none}.financial-title-copy h2{font-size:1rem}.financial-summary-row{grid-template-columns:1fr 1fr}.financial-summary-row>*{white-space:normal}.curve-panel .curve-canvas-shell{height:330px}}
+
+/* Unidade — prioridade visual: curva financeira à esquerda, avanço físico à direita */
+.unit-executive-grid{
+  grid-template-columns:minmax(0,1.18fr) minmax(390px,.82fr);
+  grid-template-areas:
+    "curve phase"
+    "summary delay";
+  align-items:start;
+}
+.curve-panel{grid-area:curve}
+.unit-phase-chart-panel{grid-area:phase}
+.phase-summary-panel{grid-area:summary}
+.delay-panel{grid-area:delay}
+.curve-panel .curve-canvas-shell{height:410px}
+.unit-phase-chart-panel .chart-wrap.tall{height:410px}
+@media(max-width:1250px){
+  .unit-executive-grid{
+    grid-template-columns:1fr;
+    grid-template-areas:"curve" "phase" "summary" "delay";
+  }
+}
