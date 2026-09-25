@@ -118,7 +118,10 @@
     const week = isoWeek(model.dataBase);
     document.getElementById('pb-wbs').textContent = level;
     document.getElementById('pb-context-date').textContent = 'Data Base: ' + dateShort(model.dataBase) + (week ? ' • Sem. ' + week : '');
-    document.getElementById('pb-file-info').textContent = fileName ? 'Arquivo ativo: ' + fileName : '';
+    const deckStatus = window.CoordinationDeck?.status?.();
+    document.getElementById('pb-file-info').textContent =
+      (fileName ? 'Excel: ' + fileName : '') +
+      (deckStatus ? ' • PPT: ' + deckStatus.fileName + (deckStatus.dataBase ? ' (' + deckStatus.dataBase + ')' : '') : '');
     document.getElementById('pb-planned').textContent = pct(summary?.planned);
     document.getElementById('pb-actual').textContent = pct(summary?.actual);
     document.getElementById('pb-gap').textContent = pp(summary?.variance);
@@ -249,24 +252,95 @@
     return { key:'normal', label:'MONITORAR' };
   }
 
+  function pptActionRows() {
+    const s = selection();
+    return window.CoordinationDeck?.actionsFor?.(s.unit, s.phase) || [];
+  }
+
+  function pptMetricRows() {
+    const s = selection();
+    return window.CoordinationDeck?.metricsFor?.(s.unit, s.phase) || [];
+  }
+
+  function pptLookaheadRows() {
+    const s = selection();
+    return window.CoordinationDeck?.lookaheadFor?.(s.unit, s.phase) || [];
+  }
+
+  function findBiRowForPpt(action, rows) {
+    const source = String(action.topic || '').toUpperCase();
+    const words = source.normalize('NFD').replace(/[\u0300-\u036f]/g,'').split(/[^A-Z0-9]+/).filter(w=>w.length>=4);
+    let best=null;
+    rows.forEach(row => {
+      const hay=(offenderLabel(row)+' '+offenderContext(row)).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+      const hits=words.filter(w=>hay.includes(w)).length;
+      const score=words.length?hits/words.length:0;
+      if(!best || score>best.score) best={row,score};
+    });
+    return best && best.score>=.34 ? best.row : null;
+  }
+
   function renderOffenders() {
-    const rows = filteredDetails()
+    const biRows = filteredDetails()
       .filter(r => Number.isFinite(r.variance) && r.variance < 0)
       .map(r => Object.assign({}, r, { __impact: impact(r) }))
       .sort((a,b)=>b.__impact-a.__impact);
+
+    const pptRows = pptActionRows();
+    const notes = offenderNotes();
+    const host = document.getElementById('pb-offenders-list');
+    host.scrollTop = 0;
+
+    if (pptRows.length) {
+      const ranked = pptRows.map(action => {
+        const bi = findBiRowForPpt(action, biRows);
+        const variance = Number.isFinite(action.variance) ? action.variance : bi?.variance;
+        const impactValue = Number.isFinite(variance) ? Math.abs(variance) : 0;
+        return { action, bi, variance, impactValue };
+      }).sort((a,b)=>b.impactValue-a.impactValue || a.action.sourceSlide-b.action.sourceSlide).slice(0,6);
+
+      document.getElementById('pb-offender-count').textContent = ranked.length + (ranked.length===1?' Ofensor':' Ofensores');
+      document.getElementById('pb-cpm-note').textContent = 'Causa/recuperação do PPT • desvio do BI quando houver correspondência';
+
+      host.innerHTML = ranked.map((item,index) => {
+        const action=item.action;
+        const id='ppt|' + [action.unitCode,action.phase,action.topic].map(v=>String(v||'')).join('|');
+        const note=notes[id] || {};
+        const deckNewer=window.CoordinationDeck?.importedAfter?.(note._editedAt);
+        const cause=(!deckNewer && note.cause) ? note.cause : (action.cause || note.cause || '');
+        const recovery=(!deckNewer && note.mitigation) ? note.mitigation : (action.plan || note.mitigation || '');
+        const cls=Number.isFinite(item.variance)
+          ? offenderClass({variance:item.variance})
+          : {key:'alerta',label:'PPT'};
+        const deviation=Number.isFinite(item.variance) ? pp(item.variance) : 'PPT';
+        const context=[action.unitCode,action.phase].filter(Boolean).join(' • ');
+        return '<article class="pb-offender pb-offender-' + cls.key + '" data-offender-id="' + esc(id) + '">' +
+          '<div class="pb-offender-head">' +
+            '<span class="pb-offender-number">' + String(index+1).padStart(2,'0') + '</span>' +
+            '<div class="pb-offender-title"><strong>' + esc(action.topic) + '</strong><span>' + esc(context) + '</span></div>' +
+            '<span class="pb-offender-ppt">PPT · S' + action.sourceSlide + '</span>' +
+            '<span class="pb-offender-impact">' + esc(deviation) + '</span>' +
+            '<span class="pb-offender-tag">' + cls.label + '</span>' +
+          '</div>' +
+          '<div class="pb-offender-body">' +
+            '<label><span>CAUSA RAIZ</span><textarea data-offender-field="cause" placeholder="Não informado no PowerPoint">' + esc(cause) + '</textarea></label>' +
+            '<label><span>PLANO DE RECUPERAÇÃO</span><textarea data-offender-field="mitigation" placeholder="Não informado no PowerPoint">' + esc(recovery) + '</textarea></label>' +
+          '</div>' +
+        '</article>';
+      }).join('');
+      return;
+    }
+
     const unique = [];
     const seen = new Set();
-    rows.forEach(row => {
+    biRows.forEach(row => {
       const id = offenderId(row);
       if (seen.has(id) || unique.length >= 4) return;
       seen.add(id);
       unique.push(row);
     });
-    const notes = offenderNotes();
     document.getElementById('pb-offender-count').textContent = unique.length + ' Ofensores';
-    document.getElementById('pb-cpm-note').textContent = 'CPM não disponível • ordenado por impacto do desvio';
-    const host = document.getElementById('pb-offenders-list');
-    host.scrollTop = 0;
+    document.getElementById('pb-cpm-note').textContent = 'Sem conteúdo correspondente no PPT • ordenado pelo BI';
     if (!unique.length) {
       host.innerHTML = '<div class="pb-empty-light">Nenhum item com desvio negativo para esta seleção.</div>';
       return;
@@ -275,31 +349,19 @@
       const id = offenderId(row);
       const note = notes[id] || {};
       const cls = offenderClass(row);
-      const selected = selection();
-      const pptMatch = window.CoordinationDeck?.matchAction?.(
-        row.__unit,
-        selected.phase || row.phase || '',
-        offenderLabel(row),
-        offenderContext(row)
-      );
-      const cause = note.cause || pptMatch?.cause || '';
-      const recovery = note.mitigation || pptMatch?.plan || '';
-      const pptBadge = pptMatch ? '<span class="pb-offender-ppt" title="Conteúdo importado do PowerPoint">PPT · S' + pptMatch.sourceSlide + '</span>' : '';
       return '<article class="pb-offender pb-offender-' + cls.key + '" data-offender-id="' + esc(id) + '">' +
         '<div class="pb-offender-head">' +
           '<span class="pb-offender-number">' + String(index+1).padStart(2,'0') + '</span>' +
           '<div class="pb-offender-title"><strong>' + esc(offenderLabel(row)) + '</strong><span>' + esc(offenderContext(row) || row.__unit) + '</span></div>' +
-          pptBadge +
           '<span class="pb-offender-impact">' + esc(pp(row.variance)) + '</span>' +
           '<span class="pb-offender-tag">' + cls.label + '</span>' +
         '</div>' +
         '<div class="pb-offender-body">' +
-          '<label><span>CAUSA RAIZ</span><textarea data-offender-field="cause" placeholder="Digite a causa raiz...">' + esc(cause) + '</textarea></label>' +
-          '<label><span>PLANO DE RECUPERAÇÃO</span><textarea data-offender-field="mitigation" placeholder="Digite o plano de recuperação...">' + esc(recovery) + '</textarea></label>' +
+          '<label><span>CAUSA RAIZ</span><textarea data-offender-field="cause" placeholder="Digite a causa raiz...">' + esc(note.cause || '') + '</textarea></label>' +
+          '<label><span>PLANO DE RECUPERAÇÃO</span><textarea data-offender-field="mitigation" placeholder="Digite o plano de recuperação...">' + esc(note.mitigation || '') + '</textarea></label>' +
         '</div>' +
       '</article>';
     }).join('');
-    host.scrollTop = 0;
   }
 
   function metricCandidates() {
@@ -330,8 +392,33 @@
   }
 
   function renderMetrics() {
-    const rows = metricCandidates();
+    const pptRows = pptMetricRows()
+      .filter(row => Number.isFinite(row.planned) || Number.isFinite(row.actual))
+      .sort((a,b)=>(Number.isFinite(a.variance)?a.variance:0)-(Number.isFinite(b.variance)?b.variance:0))
+      .slice(0,6);
     const host = document.getElementById('pb-metrics-grid');
+
+    if (pptRows.length) {
+      document.getElementById('pb-metric-count').textContent = pptRows.length + ' métricas do PPT';
+      host.innerHTML = pptRows.map((row,index) => {
+        const planned=Number.isFinite(row.planned)?row.planned:null;
+        const actual=Number.isFinite(row.actual)?row.actual:null;
+        const deviation=Number.isFinite(row.variance)?row.variance:
+          (Number.isFinite(planned)&&Number.isFinite(actual)?actual-planned:null);
+        const ratio=Number.isFinite(planned)&&planned>0&&Number.isFinite(actual)?Math.max(0,Math.min(1,actual/planned)):null;
+        const tone=Number.isFinite(deviation) ? (deviation>=0?'good':deviation>=-0.03?'attention':'critical') : 'attention';
+        const context=[row.unitCode,row.phase].filter(Boolean).join(' • ');
+        return '<div class="pb-metric pb-metric-' + tone + '">' +
+          '<div class="pb-metric-head"><strong>' + (index+1) + '. ' + esc(row.topic) + '</strong><b>' + esc(Number.isFinite(deviation)?pp(deviation):'N/D') + '</b></div>' +
+          '<div class="pb-metric-track"><span style="width:' + (Number.isFinite(ratio)?Math.min(100,ratio*100):0) + '%"></span></div>' +
+          '<div class="pb-metric-foot"><span>Prev.: <strong>' + esc(pct(planned)) + '</strong> • Real: <strong>' + esc(pct(actual)) + '</strong></span><b>PPT S' + row.sourceSlide + '</b></div>' +
+          '<small class="pb-metric-context">' + esc(context) + '</small>' +
+        '</div>';
+      }).join('');
+      return;
+    }
+
+    const rows = metricCandidates();
     document.getElementById('pb-metric-count').textContent = rows.length + ' métricas-chave';
     if (!rows.length) {
       host.innerHTML = '<div class="pb-empty-light pb-metrics-empty">Sem métricas quantitativas comparáveis para esta seleção.</div>';
@@ -378,14 +465,26 @@
   }
 
   function renderActivities() {
-    const items = activities();
-    document.getElementById('pb-lookahead-count').textContent = items.length + (items.length === 1 ? ' frente' : ' frentes');
+    const manual = activities();
+    const ppt = pptLookaheadRows().slice(0,6);
+    const total = ppt.length + manual.length;
+    document.getElementById('pb-lookahead-count').textContent = total + (total === 1 ? ' frente' : ' frentes');
     const host = document.getElementById('pb-lookahead-list');
-    if (!items.length) {
-      host.innerHTML = '<div class="pb-empty-light">Nenhuma atividade manual cadastrada para esta Unidade/Fase/Semana. Digite no campo acima para adicionar.</div>';
+    if (!total) {
+      host.innerHTML = '<div class="pb-empty-light">Nenhum plano de recuperação foi identificado no PowerPoint e nenhuma atividade manual foi cadastrada para esta seleção.</div>';
       return;
     }
-    host.innerHTML = items.map((item,index) => {
+    const pptHtml = ppt.map(item => {
+      const context=[item.unitCode,item.phase].filter(Boolean).join(' • ');
+      return '<article class="pb-activity pb-activity-ppt">' +
+        '<span class="pb-activity-icon">↗</span>' +
+        '<div class="pb-activity-copy"><strong>' + esc(item.topic) + '</strong><span>' + esc(item.plan) + '</span><small class="pb-activity-context">' + esc(context) + '</small></div>' +
+        '<span class="pb-activity-status">Plano PPT</span>' +
+        '<span class="pb-source-chip">S' + item.sourceSlide + '</span>' +
+      '</article>';
+    }).join('');
+
+    const manualHtml = manual.map(item => {
       const meta = statusMeta[item.status] || statusMeta.planejado;
       return '<article class="pb-activity pb-activity-' + esc(item.status || 'planejado') + '">' +
         '<span class="pb-activity-icon">' + meta.icon + '</span>' +
@@ -398,6 +497,8 @@
         '</div>' +
       '</article>';
     }).join('');
+
+    host.innerHTML = pptHtml + manualHtml;
   }
 
   function addQuickActivity() {
@@ -467,6 +568,7 @@
     const notes = offenderNotes();
     notes[id] = notes[id] || {};
     notes[id][target.dataset.offenderField] = target.value.trim();
+    notes[id]._editedAt = Date.now();
     writeJson('epc15_pb_offender_notes_v1', notes);
   }
 
@@ -512,7 +614,6 @@
     renderOffenders();
     renderActivities();
     renderMetrics();
-    window.CoordinationDeck?.render?.();
   }
 
   function exportManualData() {
