@@ -118,3 +118,10 @@
     grid-template-areas:"curve" "phase" "summary" "delay";
   }
 }
+
+/* Unidade: curva financeira em destaque à esquerda; avanço físico à direita */
+.unit-executive-grid{grid-template-columns:minmax(0,1.28fr) minmax(390px,.72fr);grid-template-areas:"curve phase" "summary delay";align-items:start}
+.curve-panel{grid-area:curve}.unit-phase-chart-panel{grid-area:phase}.phase-summary-panel{grid-area:summary}.delay-panel{grid-area:delay}
+.curve-panel .curve-canvas-shell{height:430px}
+.unit-phase-chart-panel .chart-wrap.tall{height:430px}
+@media(max-width:1250px){.unit-executive-grid{grid-template-columns:1fr;grid-template-areas:"curve" "phase" "summary" "delay"}}
