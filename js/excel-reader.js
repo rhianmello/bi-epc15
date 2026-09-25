@@ -324,18 +324,18 @@
   }
 
   function financialSeriesKey(label) {
-    const normalized = normalizeHeader(label);
-    const map = {
-      'BLCONTRATUAL % ACUM':'contractualPct',
-      'BLCONTRATUAL ACUM':'contractualAccum',
-      'PLAN ATAQ % ACUM':'planAttackPct',
-      'PLAN ATAQ ACUM':'planAttackAccum',
-      'REAL % ACUM':'realPct',
-      'REAL ACUM':'realAccum',
-      'PROJETADO % ACUM':'projectedPct',
-      'PROJETADO ACUM':'projectedAccum'
-    };
-    return map[normalized] || null;
+    const raw = String(label ?? '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g,'')
+      .toUpperCase()
+      .trim();
+    if (!/ACUM/.test(raw)) return null;
+    const isPercent = raw.includes('%');
+    if (/BLCONTRATUAL/.test(raw)) return isPercent ? 'contractualPct' : 'contractualAccum';
+    if (/PLAN\.?\s*ATAQ/.test(raw)) return isPercent ? 'planAttackPct' : 'planAttackAccum';
+    if (/^REAL\b/.test(raw)) return isPercent ? 'realPct' : 'realAccum';
+    if (/^PROJETADO\b/.test(raw)) return isPercent ? 'projectedPct' : 'projectedAccum';
+    return null;
   }
 
   function blockKeyFromName(name) {
