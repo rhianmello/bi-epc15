@@ -129,3 +129,15 @@
 .financial-summary-row.financial-summary-seven{grid-template-columns:1.15fr repeat(6,1fr)}
 .financial-summary-row.financial-summary-seven>*{font-size:.56rem}
 @media(max-width:900px){.financial-summary{overflow-x:auto}.financial-summary-row.financial-summary-seven{min-width:850px}}
+
+/* Sincronização Supabase */
+.cloud-controls{display:flex;flex-direction:column;align-items:flex-end;gap:6px;min-width:280px}
+.source-status{max-width:440px;color:#8fa4bd;font-size:.68rem;line-height:1.2;text-align:right}
+.source-status[data-tone="cloud"]{color:#86efac}.source-status[data-tone="local"]{color:#93c5fd}.source-status[data-tone="warning"]{color:#fcd34d}.source-status[data-tone="error"]{color:#fca5a5}
+.cloud-buttons{display:flex;gap:6px;justify-content:flex-end}
+.cloud-button{padding:7px 10px;border:1px solid rgba(148,163,184,.18);border-radius:8px;background:#101f33;color:#b9cbe0;font-size:.68rem;font-weight:800;cursor:pointer}
+.cloud-button:hover:not(:disabled){border-color:rgba(34,211,238,.34);color:#fff}
+.cloud-button-primary{border-color:rgba(34,211,238,.32);background:rgba(14,165,233,.13);color:#9de8f4}
+.cloud-button:disabled{opacity:.4;cursor:not-allowed}
+@media(max-width:1100px){.topbar{height:auto;min-height:82px;padding-top:12px;padding-bottom:12px}.topbar-actions{flex-wrap:wrap;justify-content:flex-end}.cloud-controls{order:3;width:100%;min-width:0;align-items:flex-end}}
+@media(max-width:760px){.topbar-actions{align-items:flex-end;flex-direction:column}.cloud-controls{align-items:flex-start}.source-status{text-align:left}.cloud-buttons{justify-content:flex-start;flex-wrap:wrap}}
