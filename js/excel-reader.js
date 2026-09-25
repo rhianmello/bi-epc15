@@ -304,6 +304,110 @@
     return { sheetName, units };
   }
 
+
+  function readCurveDateColumns(ws, rowIndex, maxCol) {
+    const cols = [];
+    let started = false;
+    let blanksAfterStart = 0;
+    for (let c = 21; c <= maxCol; c += 1) { // V onward
+      const value = Number(wsValue(ws, rowIndex, c));
+      if (Number.isFinite(value) && value >= 40000 && value <= 70000) {
+        cols.push({ c, serial: value });
+        started = true;
+        blanksAfterStart = 0;
+      } else if (started) {
+        blanksAfterStart += 1;
+        if (blanksAfterStart > 12) break;
+      }
+    }
+    return cols;
+  }
+
+  function financialSeriesKey(label) {
+    const normalized = normalizeHeader(label);
+    const map = {
+      'BLCONTRATUAL % ACUM':'contractualPct',
+      'BLCONTRATUAL ACUM':'contractualAccum',
+      'PLAN ATAQ % ACUM':'planAttackPct',
+      'PLAN ATAQ ACUM':'planAttackAccum',
+      'REAL % ACUM':'realPct',
+      'REAL ACUM':'realAccum',
+      'PROJETADO % ACUM':'projectedPct',
+      'PROJETADO ACUM':'projectedAccum'
+    };
+    return map[normalized] || null;
+  }
+
+  function blockKeyFromName(name) {
+    const clean = String(name ?? '').trim().replace(/\s+/g,' ');
+    if (/^EMPREENDIMENTO$/i.test(clean)) return 'EMPREENDIMENTO';
+    const match = clean.match(/U\s*-\s*(\d{4})/i);
+    return match ? 'U-' + match[1] : '';
+  }
+
+  function extractBLPlanAtaqCurveBlocks(workbook) {
+    const ws = workbook.Sheets.BLPlanAtaq;
+    if (!ws?.['!ref']) return { sheetName:'BLPlanAtaq', blocks:{}, audit:{ found:false } };
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    const blocks = {};
+    let currentName = '';
+    let currentKey = '';
+    let currentDates = [];
+
+    for (let r = range.s.r; r <= range.e.r; r += 1) {
+      const dateCols = readCurveDateColumns(ws, r, range.e.c);
+      if (dateCols.length >= 30) currentDates = dateCols;
+
+      const scopeName = String(wsValue(ws,r,19) ?? '').trim().replace(/\s+/g,' '); // T
+      const label = String(wsValue(ws,r,20) ?? '').trim(); // U
+      if (scopeName && (/^EMPREENDIMENTO$/i.test(scopeName) || /U\s*-\s*\d{4}/i.test(scopeName))) {
+        currentName = scopeName;
+        currentKey = blockKeyFromName(scopeName);
+      }
+
+      const seriesKey = financialSeriesKey(label);
+      if (!seriesKey || !currentKey || !currentDates.length) continue;
+
+      const values = currentDates.map(({c}) => {
+        const raw = wsValue(ws,r,c);
+        const n = Number(raw);
+        return raw == null || raw === '' || !Number.isFinite(n) ? null : n;
+      });
+
+      if (!blocks[currentKey]) {
+        blocks[currentKey] = {
+          key: currentKey,
+          name: currentName,
+          firstRow: r + 1,
+          lastRow: r + 1,
+          dates: currentDates.map(x => x.serial),
+          series: {},
+          sourceRows: {}
+        };
+      }
+      const block = blocks[currentKey];
+      block.name = currentName || block.name;
+      block.lastRow = r + 1;
+      block.dates = currentDates.map(x => x.serial);
+      block.series[seriesKey] = values;
+      block.sourceRows[seriesKey] = r + 1;
+    }
+
+    const keys = Object.keys(blocks);
+    return {
+      sheetName:'BLPlanAtaq',
+      blocks,
+      audit:{
+        found:true,
+        blockKeys:keys,
+        blockCount:keys.length,
+        sourceColumnName:'T',
+        sourceColumnSeries:'U',
+        firstDataColumn:'V'
+      }
+    };
+  }
+
   function extractFinancialSources(workbook) {
     const aliases = {
       contractual: ['BLContratual'],
@@ -340,7 +444,8 @@
       : null;
     const curvesCharts = await extractCurvesCharts(buffer, workbook);
     const financialSources = extractFinancialSources(workbook);
-    return { workbook, primary, summary, curvesCharts, financialSources, headerRow };
+    const blPlanAtaqCurves = extractBLPlanAtaqCurveBlocks(workbook);
+    return { workbook, primary, summary, curvesCharts, financialSources, blPlanAtaqCurves, headerRow };
   }
 
   window.ExcelReader = { readWorkbook };
