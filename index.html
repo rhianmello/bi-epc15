@@ -38,15 +38,15 @@
       </div>
 
       <input id="excel-input" type="file" accept=".xlsb,.xlsx,.xlsm" hidden>
-      <p class="privacy-note">Os arquivos são processados somente neste navegador. Nenhum dado é enviado para servidores.</p>
+      <p class="privacy-note">O Excel é processado localmente. Somente ao clicar em <strong>Publicar atualização</strong> o dataset tratado do BI é enviado ao Supabase.</p>
       <div id="upload-error" class="alert hidden" role="alert"></div>
     </div>
   </section>
 
   <div id="loading" class="loading hidden" aria-live="polite">
     <div class="spinner"></div>
-    <strong>Analisando o arquivo...</strong>
-    <span>Validando abas, hierarquia e indicadores.</span>
+    <strong id="loading-title">Analisando o arquivo...</strong>
+    <span id="loading-detail">Validando abas, hierarquia e indicadores.</span>
   </div>
 
   <div id="app-shell" class="app-shell hidden">
@@ -74,6 +74,13 @@
           <h2 id="page-title">Visão Executiva</h2>
         </div>
         <div class="topbar-actions">
+          <div class="cloud-controls">
+            <span id="source-status" class="source-status" data-tone="neutral">Fonte atual: nenhum dado</span>
+            <div class="cloud-buttons">
+              <button id="use-published" class="cloud-button" type="button">Usar versão publicada</button>
+              <button id="publish-update" class="cloud-button cloud-button-primary" type="button" disabled>Publicar atualização</button>
+            </div>
+          </div>
           <button id="select-excel-dashboard" class="dashboard-file-button" type="button">Selecionar Excel</button>
           <div class="topbar-meta">
             <span>Data-base</span>
@@ -314,12 +321,15 @@
     </form>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="vendor/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="vendor/chart.umd.min.js"></script>
   <script src="vendor/html2canvas.min.js"></script>
   <script src="vendor/jspdf.umd.min.js"></script>
   <script src="js/config.js"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/cloud-sync.js"></script>
   <script src="js/excel-reader.js"></script>
   <script src="js/data-model.js"></script>
   <script src="js/charts.js"></script>
