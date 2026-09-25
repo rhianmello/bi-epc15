@@ -247,13 +247,18 @@
           </article>
 
           <article class="panel curve-panel">
-            <div class="panel-heading">
-              <div><p class="eyebrow">CURVAS • EXCEL</p><h3>Curva de execução financeira</h3></div>
-              <span class="curve-source">Aba CURVAS</span>
+            <div class="financial-title">
+              <div class="financial-logo"><b>CPL</b><span>EPC-15</span></div>
+              <div class="financial-title-copy">
+                <h2>CURVA DE EXECUÇÃO FINANCEIRA</h2>
+                <h3 id="unit-curve-unit">UNIDADE</h3>
+              </div>
+              <div class="financial-title-meta"><strong id="unit-curve-date">Data-base: —</strong><small id="unit-curve-source">Fonte financeira</small></div>
             </div>
+            <div id="unit-financial-summary" class="financial-summary"></div>
             <div class="curve-canvas-shell">
               <canvas id="unit-curve-chart"></canvas>
-              <div id="unit-curve-empty" class="curve-empty">Nenhum gráfico da aba CURVAS foi identificado para esta unidade.</div>
+              <div id="unit-curve-empty" class="curve-empty">Não foi possível montar a curva financeira desta unidade a partir das abas-fonte.</div>
             </div>
           </article>
         </div>
