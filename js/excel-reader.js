@@ -425,18 +425,14 @@
 
 
   function directFinanceKey(label) {
-    const n = normalizeHeader(label);
-    const map = {
-      'BLCONTRATUAL ACUM':'contractualAmount',
-      'BLCONTRATUAL X ACUM':'contractualPct',
-      'PLAN ATAQ ACUM':'planAmount',
-      'PLAN ATAQ X ACUM':'planPct',
-      'REAL ACUM':'realAmount',
-      'REAL X ACUM':'realPct',
-      'PROJETADO ACUM':'projectedAmount',
-      'PROJETADO X ACUM':'projectedPct'
-    };
-    return map[n] || null;
+    const raw = String(label ?? '');
+    const isPct = raw.includes('%');
+    const n = normalizeHeader(raw);
+    if (n === 'BLCONTRATUAL ACUM') return isPct ? 'contractualPct' : 'contractualAmount';
+    if (n === 'PLAN ATAQ ACUM') return isPct ? 'planPct' : 'planAmount';
+    if (n === 'REAL ACUM') return isPct ? 'realPct' : 'realAmount';
+    if (n === 'PROJETADO ACUM') return isPct ? 'projectedPct' : 'projectedAmount';
+    return null;
   }
 
   function financeScope(value) {
