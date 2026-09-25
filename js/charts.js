@@ -56,42 +56,53 @@
     const canvas = document.getElementById('unit-curve-chart');
     if (!canvas) return false;
 
-    const palette = ['#60a5fa','#f59e0b','#0f172a','#22c55e','#8b5cf6','#ef4444'];
-    let labels = curve.series.find(s => s.categories?.length)?.categories || [];
-    const maxLen = Math.max(...curve.series.map(s => s.values?.length || 0), labels.length);
-    if (!labels.length) labels = Array.from({length:maxLen}, (_,i) => String(i+1));
+    const labels = curve.labels || curve.series.find(s => s.categories?.length)?.categories || [];
+    const rawSource = curve.source === 'financial-sheets';
+    const styles = {
+      planAttack:{color:'#69a9e7',dash:[],width:1.8,points:0},
+      contractual:{color:'#0b2f70',dash:[],width:2.0,points:0},
+      real:{color:'#159447',dash:[],width:2.2,points:5},
+      projected:{color:'#f2b700',dash:[7,5],width:2.0,points:0}
+    };
+    const fallback = ['#60a5fa','#0f172a','#22c55e','#f59e0b','#8b5cf6','#ef4444'];
 
     const allValues = curve.series.flatMap(s => s.values || []).filter(Number.isFinite);
-    const asPercent = allValues.length && Math.max(...allValues.map(v => Math.abs(v))) <= 1.5;
-    const datasets = curve.series.map((s,i) => ({
-      label: s.name,
-      data: (s.values || []).map(v => Number.isFinite(v) ? (asPercent ? v * 100 : v) : null),
-      borderColor: palette[i % palette.length],
-      backgroundColor: palette[i % palette.length],
-      borderWidth: i === 2 ? 2.2 : 1.6,
-      borderDash: /BL|BASE|PLANO/i.test(s.name) ? [5,4] : [],
-      pointRadius: 0,
-      pointHoverRadius: 3,
-      tension: .12,
-      spanGaps: true
-    }));
+    const asPercent = rawSource || (allValues.length && Math.max(...allValues.map(v => Math.abs(v))) <= 1.5);
+
+    const datasets = curve.series.map((s,i) => {
+      const st = styles[s.key] || {color:fallback[i%fallback.length],dash:[],width:1.8,points:0};
+      const data = (s.values || []).map(v => Number.isFinite(v) ? (asPercent ? v*100 : v) : null);
+      return {
+        label:s.name,
+        data,
+        borderColor:st.color,
+        backgroundColor:st.color,
+        borderWidth:st.width,
+        borderDash:st.dash,
+        pointRadius:s.key === 'real' ? data.map(v => Number.isFinite(v) ? 4 : 0) : st.points,
+        pointHoverRadius:s.key === 'real' ? 6 : 3,
+        tension:.12,
+        spanGaps:false
+      };
+    });
 
     registry.unitCurve = new Chart(canvas, {
       type:'line',
       data:{labels,datasets},
       options:{
         responsive:true,maintainAspectRatio:false,
+        animation:{duration:250},
         interaction:{mode:'index',intersect:false},
         plugins:{
-          legend:{position:'top',align:'start',labels:{color:'#334155',usePointStyle:true,boxWidth:7,font:{size:10}}},
+          legend:{position:'top',align:'start',labels:{color:'#172033',usePointStyle:false,boxWidth:28,font:{size:10,weight:'600'}}},
           tooltip:{callbacks:{label:ctx => {
             const v=ctx.parsed.y;
             return Number.isFinite(v) ? ctx.dataset.label + ': ' + v.toLocaleString('pt-BR',{maximumFractionDigits:2}) + (asPercent?'%':'') : ctx.dataset.label + ': —';
           }}}
         },
         scales:{
-          x:{grid:{color:'rgba(15,23,42,.08)'},ticks:{color:'#64748b',maxRotation:90,minRotation:0,autoSkip:true,maxTicksLimit:16,font:{size:9}}},
-          y:{beginAtZero:true,suggestedMax:asPercent?100:undefined,grid:{color:'rgba(15,23,42,.10)'},ticks:{color:'#64748b',callback:v=>asPercent?v+'%':v}}
+          x:{grid:{color:'rgba(255,255,255,.75)'},ticks:{color:'#111827',maxRotation:90,minRotation:90,autoSkip:true,maxTicksLimit:36,font:{size:8}}},
+          y:{beginAtZero:true,min:0,max:asPercent?100:undefined,grid:{color:'rgba(255,255,255,.92)'},ticks:{color:'#111827',font:{size:9},callback:v=>asPercent?Number(v).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%':v}}
         }
       }
     });
