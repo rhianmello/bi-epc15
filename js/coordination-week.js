@@ -266,6 +266,7 @@
     const saveButton=document.getElementById('pb-save-week');
     try {
       if(saveButton){saveButton.disabled=true;saveButton.textContent='Salvando...';}
+      const pbManual=window.PBDashboard?.exportWeekData?.(week) || {};
       const saved=await window.CloudSync.saveCoordinationWeek({
         masterPassword,
         weekNo:week,
@@ -273,12 +274,21 @@
         excelFileName:file.name || publication.file_name || 'Versão publicada',
         pptFileName:deckStatus?.fileName || null,
         pptDataBase:modelDate(deckStatus?.dataBase),
-        pbManual:window.PBDashboard?.exportWeekData?.(week) || {},
+        pbManual,
         coordinationDeck:deck
       });
       usingLiveDraft=false;
+      activeSnapshot=true;
+      currentSnapshot={
+        ...saved,
+        dataset:{schema_version:'epc15_coordination_week_v1',model},
+        pb_manual:pbManual,
+        coordination_deck:deck
+      };
       await ensureCloudWeeks(true);
-      await loadWeek(week);
+      const refreshed=weekByNo(week);
+      if(refreshed) refreshed.has_snapshot=true;
+      window.PBDashboard?.useSnapshot?.(model, file.name || publication.file_name || 'Versão publicada');
       const badge=document.getElementById('pb-save-feedback');
       if(badge){badge.textContent='Semana '+week+' salva • V'+saved.version_no;badge.dataset.tone='ok';}
     } catch(error) {
