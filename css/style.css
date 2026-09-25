@@ -125,3 +125,7 @@
 .curve-panel .curve-canvas-shell{height:430px}
 .unit-phase-chart-panel .chart-wrap.tall{height:430px}
 @media(max-width:1250px){.unit-executive-grid{grid-template-columns:1fr;grid-template-areas:"curve" "phase" "summary" "delay"}}
+
+.financial-summary-row.financial-summary-seven{grid-template-columns:1.15fr repeat(6,1fr)}
+.financial-summary-row.financial-summary-seven>*{font-size:.56rem}
+@media(max-width:900px){.financial-summary{overflow-x:auto}.financial-summary-row.financial-summary-seven{min-width:850px}}
