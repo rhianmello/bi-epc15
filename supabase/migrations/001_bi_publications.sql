@@ -85,7 +85,7 @@ language plpgsql
 stable
 security definer
 set search_path = public, extensions
-as $
+as $$
 declare
   v_row public.bi_publications%rowtype;
   v_dataset_type text := coalesce(nullif(p_dataset_type,''),'epc15');
@@ -209,7 +209,7 @@ language plpgsql
 stable
 security definer
 set search_path = public, extensions
-as $
+as $$
 declare
   v_dataset_type text := coalesce(nullif(p_dataset_type,''),'epc15');
 begin
