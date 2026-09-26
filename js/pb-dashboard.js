@@ -6,6 +6,9 @@
   let paretoChart = null;
   let currentEditId = null;
   let initialized = false;
+  const PAGE_SIZE = 6;
+  const pageState = { lookahead:0, offenders:0, metrics:0 };
+  let lastScopeKey = '';
 
   const pt1 = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 });
   const pt0 = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
@@ -34,6 +37,35 @@
       phase: document.getElementById('pb-phase-filter')?.value || '',
       week: document.getElementById('pb-week-filter')?.value || ''
     };
+  }
+
+  function resetPagination() {
+    pageState.lookahead = 0;
+    pageState.offenders = 0;
+    pageState.metrics = 0;
+  }
+
+  function paged(items, key) {
+    const total = items.length;
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    pageState[key] = Math.max(0, Math.min(pageState[key] || 0, totalPages - 1));
+    const start = pageState[key] * PAGE_SIZE;
+    return { items:items.slice(start,start+PAGE_SIZE), total, totalPages, page:pageState[key], start };
+  }
+
+  function renderPager(elementId, key, pageInfo) {
+    const host=document.getElementById(elementId);
+    if(!host) return;
+    if(!pageInfo || pageInfo.totalPages<=1) {
+      host.classList.add('hidden');
+      host.innerHTML='';
+      return;
+    }
+    host.classList.remove('hidden');
+    host.innerHTML =
+      '<button type="button" data-pb-page-key="'+key+'" data-pb-page-dir="-1"' + (pageInfo.page<=0?' disabled':'') + '>← Anterior</button>' +
+      '<span>'+(pageInfo.page+1)+' / '+pageInfo.totalPages+' • '+pageInfo.total+' itens</span>' +
+      '<button type="button" data-pb-page-key="'+key+'" data-pb-page-dir="1"' + (pageInfo.page>=pageInfo.totalPages-1?' disabled':'') + '>Próxima →</button>';
   }
 
   function selectedUnits() {
@@ -310,18 +342,20 @@
     host.scrollTop = 0;
 
     if (pptRows.length) {
-      const ranked = pptRows.map(action => {
+      const rankedAll = pptRows.map(action => {
         const bi = findBiRowForPpt(action, biRows);
         const variance = Number.isFinite(action.variance) ? action.variance : bi?.variance;
         const impactValue = Number.isFinite(variance) ? Math.abs(variance) : 0;
         return { action, bi, variance, impactValue };
-      }).sort((a,b)=>b.impactValue-a.impactValue || a.action.sourceSlide-b.action.sourceSlide).slice(0,6);
+      }).sort((a,b)=>b.impactValue-a.impactValue || a.action.sourceSlide-b.action.sourceSlide);
 
-      document.getElementById('pb-offender-count').textContent = ranked.length + (ranked.length===1?' Ofensor':' Ofensores');
-      document.getElementById('pb-cpm-note').textContent = 'Causa/recuperação do PPT • desvio do BI quando houver correspondência';
+      const pageInfo = paged(rankedAll,'offenders');
+      document.getElementById('pb-offender-count').textContent = rankedAll.length + (rankedAll.length===1?' Ofensor':' Ofensores');
+      document.getElementById('pb-cpm-note').textContent = 'Causa/recuperação do PPT • todos os itens disponíveis por páginas';
+      renderPager('pb-offenders-pager','offenders',pageInfo);
 
       const disabled = canEdit() ? '' : ' disabled';
-      host.innerHTML = ranked.map((item,index) => {
+      host.innerHTML = pageInfo.items.map((item,index) => {
         const action=item.action;
         const id='ppt|' + [action.unitCode,action.phase,action.topic].map(v=>String(v||'')).join('|');
         const note=notes[id] || {};
@@ -333,9 +367,10 @@
           : {key:'alerta',label:'PPT'};
         const deviation=Number.isFinite(item.variance) ? pp(item.variance) : 'PPT';
         const context=[action.unitCode,action.phase].filter(Boolean).join(' • ');
+        const number=pageInfo.start+index+1;
         return '<article class="pb-offender pb-offender-' + cls.key + '" data-offender-id="' + esc(id) + '">' +
           '<div class="pb-offender-head">' +
-            '<span class="pb-offender-number">' + String(index+1).padStart(2,'0') + '</span>' +
+            '<span class="pb-offender-number">' + String(number).padStart(2,'0') + '</span>' +
             '<div class="pb-offender-title"><strong>' + esc(action.topic) + '</strong><span>' + esc(context) + '</span></div>' +
             '<span class="pb-offender-ppt">PPT · S' + action.sourceSlide + '</span>' +
             '<span class="pb-offender-impact">' + esc(deviation) + '</span>' +
@@ -354,24 +389,27 @@
     const seen = new Set();
     biRows.forEach(row => {
       const id = offenderId(row);
-      if (seen.has(id) || unique.length >= 4) return;
+      if (seen.has(id)) return;
       seen.add(id);
       unique.push(row);
     });
     document.getElementById('pb-offender-count').textContent = unique.length + ' Ofensores';
     document.getElementById('pb-cpm-note').textContent = 'Sem conteúdo correspondente no PPT • ordenado pelo BI';
     if (!unique.length) {
+      renderPager('pb-offenders-pager','offenders',null);
       host.innerHTML = '<div class="pb-empty-light">Nenhum item com desvio negativo para esta seleção.</div>';
       return;
     }
+    const pageInfo=paged(unique,'offenders');
+    renderPager('pb-offenders-pager','offenders',pageInfo);
     const disabled = canEdit() ? '' : ' disabled';
-    host.innerHTML = unique.map((row,index) => {
+    host.innerHTML = pageInfo.items.map((row,index) => {
       const id = offenderId(row);
       const note = notes[id] || {};
       const cls = offenderClass(row);
       return '<article class="pb-offender pb-offender-' + cls.key + '" data-offender-id="' + esc(id) + '">' +
         '<div class="pb-offender-head">' +
-          '<span class="pb-offender-number">' + String(index+1).padStart(2,'0') + '</span>' +
+          '<span class="pb-offender-number">' + String(pageInfo.start+index+1).padStart(2,'0') + '</span>' +
           '<div class="pb-offender-title"><strong>' + esc(offenderLabel(row)) + '</strong><span>' + esc(offenderContext(row) || row.__unit) + '</span></div>' +
           '<span class="pb-offender-impact">' + esc(pp(row.variance)) + '</span>' +
           '<span class="pb-offender-tag">' + cls.label + '</span>' +
@@ -414,22 +452,23 @@
   function renderMetrics() {
     const pptRows = pptMetricRows()
       .filter(row => Number.isFinite(row.planned) || Number.isFinite(row.actual))
-      .sort((a,b)=>(Number.isFinite(a.variance)?a.variance:0)-(Number.isFinite(b.variance)?b.variance:0))
-      .slice(0,6);
+      .sort((a,b)=>(Number.isFinite(a.variance)?a.variance:0)-(Number.isFinite(b.variance)?b.variance:0));
     const host = document.getElementById('pb-metrics-grid');
 
     if (pptRows.length) {
+      const pageInfo=paged(pptRows,'metrics');
       document.getElementById('pb-metric-count').textContent = pptRows.length + ' métricas do PPT';
-      host.innerHTML = pptRows.map((row,index) => {
+      renderPager('pb-metrics-pager','metrics',pageInfo);
+      host.innerHTML = pageInfo.items.map((row,index) => {
         const planned=Number.isFinite(row.planned)?row.planned:null;
         const actual=Number.isFinite(row.actual)?row.actual:null;
         const deviation=Number.isFinite(row.variance)?row.variance:
           (Number.isFinite(planned)&&Number.isFinite(actual)?actual-planned:null);
         const ratio=Number.isFinite(planned)&&planned>0&&Number.isFinite(actual)?Math.max(0,Math.min(1,actual/planned)):null;
         const tone=Number.isFinite(deviation) ? (deviation>=0?'good':deviation>=-0.03?'attention':'critical') : 'attention';
-        const context=[row.unitCode,row.phase].filter(Boolean).join(' • ');
+        const context=[row.unitCode,row.phase,row.kind==='phase-summary'?'Resumo da fase':''].filter(Boolean).join(' • ');
         return '<div class="pb-metric pb-metric-' + tone + '">' +
-          '<div class="pb-metric-head"><strong>' + (index+1) + '. ' + esc(row.topic) + '</strong><b>' + esc(Number.isFinite(deviation)?pp(deviation):'N/D') + '</b></div>' +
+          '<div class="pb-metric-head"><strong>' + (pageInfo.start+index+1) + '. ' + esc(row.topic) + '</strong><b>' + esc(Number.isFinite(deviation)?pp(deviation):'N/D') + '</b></div>' +
           '<div class="pb-metric-track"><span style="width:' + (Number.isFinite(ratio)?Math.min(100,ratio*100):0) + '%"></span></div>' +
           '<div class="pb-metric-foot"><span>Prev.: <strong>' + esc(pct(planned)) + '</strong> • Real: <strong>' + esc(pct(actual)) + '</strong></span><b>PPT S' + row.sourceSlide + '</b></div>' +
           '<small class="pb-metric-context">' + esc(context) + '</small>' +
@@ -440,6 +479,7 @@
 
     const rows = metricCandidates();
     document.getElementById('pb-metric-count').textContent = rows.length + ' métricas-chave';
+    renderPager('pb-metrics-pager','metrics',null);
     if (!rows.length) {
       host.innerHTML = '<div class="pb-empty-light pb-metrics-empty">Sem métricas quantitativas comparáveis para esta seleção.</div>';
       return;
@@ -490,26 +530,33 @@
     const add = document.getElementById('pb-activity-add');
     if (quick) quick.disabled = !editable;
     if (add) add.disabled = !editable;
-    const manual = activities();
-    const ppt = pptLookaheadRows().slice(0,6);
-    const total = ppt.length + manual.length;
+
+    const combined = [
+      ...pptLookaheadRows().map(item => ({kind:'ppt',item})),
+      ...activities().map(item => ({kind:'manual',item}))
+    ];
+    const total=combined.length;
     document.getElementById('pb-lookahead-count').textContent = total + (total === 1 ? ' frente' : ' frentes');
     const host = document.getElementById('pb-lookahead-list');
     if (!total) {
+      renderPager('pb-lookahead-pager','lookahead',null);
       host.innerHTML = '<div class="pb-empty-light">Nenhum plano de recuperação foi identificado no PowerPoint e nenhuma atividade manual foi cadastrada para esta seleção.</div>';
       return;
     }
-    const pptHtml = ppt.map(item => {
-      const context=[item.unitCode,item.phase].filter(Boolean).join(' • ');
-      return '<article class="pb-activity pb-activity-ppt">' +
-        '<span class="pb-activity-icon">↗</span>' +
-        '<div class="pb-activity-copy"><strong>' + esc(item.topic) + '</strong><span>' + esc(item.plan) + '</span><small class="pb-activity-context">' + esc(context) + '</small></div>' +
-        '<span class="pb-activity-status">Plano PPT</span>' +
-        '<span class="pb-source-chip">S' + item.sourceSlide + '</span>' +
-      '</article>';
-    }).join('');
 
-    const manualHtml = manual.map(item => {
+    const pageInfo=paged(combined,'lookahead');
+    renderPager('pb-lookahead-pager','lookahead',pageInfo);
+    host.innerHTML = pageInfo.items.map(entry => {
+      const item=entry.item;
+      if(entry.kind==='ppt') {
+        const context=[item.unitCode,item.phase].filter(Boolean).join(' • ');
+        return '<article class="pb-activity pb-activity-ppt">' +
+          '<span class="pb-activity-icon">↗</span>' +
+          '<div class="pb-activity-copy"><strong>' + esc(item.topic) + '</strong><span>' + esc(item.plan) + '</span><small class="pb-activity-context">' + esc(context) + '</small></div>' +
+          '<span class="pb-activity-status">Plano PPT</span>' +
+          '<span class="pb-source-chip">S' + item.sourceSlide + '</span>' +
+        '</article>';
+      }
       const meta = statusMeta[item.status] || statusMeta.planejado;
       return '<article class="pb-activity pb-activity-' + esc(item.status || 'planejado') + '">' +
         '<span class="pb-activity-icon">' + meta.icon + '</span>' +
@@ -522,8 +569,6 @@
         '</div>' : '<span class="pb-readonly-chip">Somente leitura</span>') +
       '</article>';
     }).join('');
-
-    host.innerHTML = pptHtml + manualHtml;
   }
 
   function addQuickActivity() {
@@ -607,15 +652,26 @@
     if (initialized) return;
     initialized = true;
     const page = document.getElementById('page-pb');
-    document.getElementById('pb-unit-filter')?.addEventListener('change', () => { populatePhaseFilter(); render(); });
-    document.getElementById('pb-phase-filter')?.addEventListener('change', render);
+    document.getElementById('pb-unit-filter')?.addEventListener('change', () => { resetPagination(); populatePhaseFilter(); render(); });
+    document.getElementById('pb-phase-filter')?.addEventListener('change', () => { resetPagination(); render(); });
     document.getElementById('pb-activity-add')?.addEventListener('click', addQuickActivity);
     document.getElementById('pb-activity-quick')?.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); addQuickActivity(); }});
     page?.addEventListener('click', event => {
       const edit = event.target.closest('[data-activity-edit]');
       const move = event.target.closest('[data-activity-move]');
+      const pager = event.target.closest('[data-pb-page-key]');
       if (edit) openActivityModal(edit.dataset.activityEdit);
       if (move) moveActivity(move.dataset.activityId, move.dataset.activityMove);
+      if (pager) {
+        const key=pager.dataset.pbPageKey;
+        const dir=Number(pager.dataset.pbPageDir)||0;
+        if (key && Object.prototype.hasOwnProperty.call(pageState,key)) {
+          pageState[key]=Math.max(0,(pageState[key]||0)+dir);
+          if(key==='lookahead') renderActivities();
+          if(key==='offenders') renderOffenders();
+          if(key==='metrics') renderMetrics();
+        }
+      }
     });
     page?.addEventListener('change', event => {
       if (event.target.matches('[data-offender-field]')) saveOffenderField(event.target);
@@ -672,6 +728,8 @@
 
   function render() {
     if (!model) return;
+    const scopeKey=JSON.stringify(selection());
+    if(scopeKey!==lastScopeKey){resetPagination();lastScopeKey=scopeKey;}
     const summary = scopeSummary();
     renderContext(summary);
     renderPareto();
