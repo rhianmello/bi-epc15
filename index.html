@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#07111f">
   <title>BI EPC-15</title>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=20260926-ppt-summary">
   <style>
     /* Ajustes CPL / Reunião de Coordenação */
     .nav-item[data-page="executive"]::after,.nav-item[data-page="pb"]::after{content:""}
@@ -188,6 +188,7 @@
               <div><h3>AVANÇO FÍSICO GLOBAL &amp; ANÁLISE DE DESVIOS</h3></div>
               <div class="pb-context"><span id="pb-wbs">WBS Nível 0</span><b id="pb-context-date">Data Base: N/D</b></div>
             </header>
+            <p id="pb-summary-note" class="pb-summary-note hidden" role="status"></p>
             <div class="pb-physical-grid">
               <div class="pb-progress-stack">
                 <div class="pb-progress-box pb-planned-box">
@@ -205,12 +206,12 @@
                 </div>
               </div>
               <div class="pb-pareto">
-                <div class="pb-subhead"><strong>Pareto de Ofensores (80/20)</strong><span id="pb-pareto-marker">Sem desvios</span></div>
+                <div class="pb-subhead"><strong id="pb-pareto-title">Pareto de Desvios</strong><span id="pb-pareto-marker">Sem desvios</span></div>
                 <div class="pb-pareto-chart-wrap">
                   <canvas id="pb-pareto-chart"></canvas>
                   <div id="pb-pareto-empty" class="pb-chart-empty hidden">Sem desvios comparáveis para esta seleção.</div>
                 </div>
-                <div class="pb-pareto-legend"><span>■ % Desvio individual</span><span>— Curva Acum. (80%)</span></div>
+                <div class="pb-pareto-legend"><span id="pb-pareto-share-label">■ % Desvio individual</span><span>— Curva Acum. (80%)</span></div>
               </div>
             </div>
           </article>
@@ -397,11 +398,11 @@
   <script src="js/data-model.js"></script>
   <script src="js/charts.js"></script>
   <script src="js/dashboard.js"></script>
-  <script src="js/pb-dashboard.js"></script>
+  <script src="js/pb-dashboard.js?v=20260926-ppt-summary"></script>
   <script src="js/presentation.js"></script>
   <script src="js/export.js"></script>
   <script src="js/app.js"></script>
-  <script src="js/coordination-deck.js"></script>
+  <script src="js/coordination-deck.js?v=20260926-ppt-summary"></script>
   <script src="js/coordination-week.js"></script>
 </body>
 </html>

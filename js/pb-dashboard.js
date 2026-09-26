@@ -11,6 +11,7 @@
   let lastScopeKey = '';
 
   const pt1 = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 });
+  const pt2 = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const pt0 = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
   const esc = value => String(value == null ? '' : value).replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
   const pct = value => Number.isFinite(value) ? pt1.format(value * 100) + '%' : 'N/D';
@@ -107,6 +108,8 @@
 
   function scopeSummary() {
     const s = selection();
+    const ppt = window.CoordinationDeck?.summaryFor?.(s.unit, s.phase);
+    if (ppt) return ppt;
     if (!s.unit && !s.phase) return model.contract;
     if (s.unit) {
       const unit = model.units.find(u => u.code === s.unit);
@@ -155,17 +158,35 @@
 
   function renderContext(summary) {
     const s = selection();
+    const fromPpt = summary?.source === 'ppt';
+    const source = fromPpt ? 'PPT' : 'Excel';
+    const rawDate = fromPpt ? summary.dataBase : model.dataBase;
+    const sourceDate = rawDate instanceof Date && !Number.isNaN(rawDate.valueOf())
+      ? new Intl.DateTimeFormat('pt-BR', {timeZone:'UTC'}).format(rawDate)
+      : (/^\d{2}\/\d{2}\/\d{4}$/.test(String(rawDate || '')) ? rawDate : 'N/D');
+    const formatPct = value => fromPpt
+      ? (Number.isFinite(value) ? pt2.format(value * 100) + '%' : 'N/D') : pct(value);
+    const formatGap = value => fromPpt
+      ? (Number.isFinite(value) ? (value > 0 ? '+' : '') + pt2.format(value * 100) + ' p.p.' : 'N/D') : pp(value);
     const level = s.phase ? 'WBS Nível 2' : s.unit ? 'WBS Nível 1' : 'WBS Nível 0';
     const week = Number(s.week) || window.CoordinationWeek?.getSelectedWeek?.() || null;
     document.getElementById('pb-wbs').textContent = level;
-    document.getElementById('pb-context-date').textContent = 'Data Base: ' + dateShort(model.dataBase) + (week ? ' • Sem. EPC-15 ' + week : '');
+    document.getElementById('pb-context-date').textContent = source + ' • Data-base: ' + sourceDate +
+      (summary?.sourceSlide ? ' • Slide ' + summary.sourceSlide : '') + (week ? ' • Sem. ' + week : '');
+    const dateFilter = document.getElementById('pb-date-filter');
+    if (dateFilter) dateFilter.innerHTML = '<option value="current">' + esc(source + ' • ' + sourceDate) + '</option>';
+    const summaryNote = document.getElementById('pb-summary-note');
+    if (summaryNote) {
+      summaryNote.textContent = summary?.message || '';
+      summaryNote.classList.toggle('hidden', !summary?.message);
+    }
     const deckStatus = window.CoordinationDeck?.status?.();
     document.getElementById('pb-file-info').textContent =
       (fileName ? 'Excel: ' + fileName : '') +
       (deckStatus ? ' • PPT: ' + deckStatus.fileName + (deckStatus.dataBase ? ' (' + deckStatus.dataBase + ')' : '') : '');
-    document.getElementById('pb-planned').textContent = pct(summary?.planned);
-    document.getElementById('pb-actual').textContent = pct(summary?.actual);
-    document.getElementById('pb-gap').textContent = pp(summary?.variance);
+    document.getElementById('pb-planned').textContent = formatPct(summary?.planned);
+    document.getElementById('pb-actual').textContent = formatPct(summary?.actual);
+    document.getElementById('pb-gap').textContent = formatGap(summary?.variance);
     document.getElementById('pb-gap').className = 'pb-gap-value ' + (Number.isFinite(summary?.variance) && summary.variance >= 0 ? 'positive' : 'negative');
     document.getElementById('pb-planned-week').textContent = 'N/D';
     document.getElementById('pb-actual-week').textContent = 'N/D';
@@ -191,17 +212,33 @@
     return text.length > 15 ? text.slice(0,13) + '…' : text;
   }
 
-  function buildPareto() {
+  function buildPareto(summary) {
     const s = selection();
     const groups = new Map();
-    filteredDetails().forEach(row => {
-      const v = impact(row);
-      if (!(v > 0)) return;
-      const label = groupLabel(row, Boolean(s.phase));
-      groups.set(label, (groups.get(label) || 0) + v);
-    });
-    const sorted = [...groups.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5);
-    const total = sorted.reduce((a,b)=>a+b[1],0);
+    if (summary?.source === 'ppt') {
+      const metrics = (window.CoordinationDeck?.metricsFor?.(s.unit, s.phase) || [])
+        .filter(row => !summary.dataBase || row.dataBase === summary.dataBase);
+      // Pick one level to avoid counting a phase and its children twice.
+      const kind = s.phase && s.unit
+        ? (metrics.some(row => row.kind === 'delivery') ? 'delivery' : 'discipline')
+        : (s.phase || s.unit ? 'phase-summary' : 'unit-summary');
+      metrics.filter(row => row.kind === kind && Number.isFinite(row.variance) && row.variance < 0)
+        .forEach(row => {
+          const label = !s.unit ? [row.unitCode, row.unitName].filter(Boolean).join(' — ')
+            : (s.phase ? row.topic : row.phase);
+          groups.set(label, (groups.get(label) || 0) + Math.abs(row.variance));
+        });
+    } else {
+      filteredDetails().forEach(row => {
+        const v = impact(row);
+        if (!(v > 0)) return;
+        const label = groupLabel(row, Boolean(s.phase));
+        groups.set(label, (groups.get(label) || 0) + v);
+      });
+    }
+    const all = [...groups.entries()].sort((a,b)=>b[1]-a[1]);
+    const total = all.reduce((a,b)=>a+b[1],0);
+    const sorted = all.slice(0,5);
     let acc = 0;
     return sorted.map(([label,value]) => {
       const share = total ? value / total * 100 : 0;
@@ -210,16 +247,22 @@
     });
   }
 
-  function renderPareto() {
-    const data = buildPareto();
+  function renderPareto(summary) {
+    const fromPpt = summary?.source === 'ppt';
+    const data = buildPareto(summary);
     const empty = document.getElementById('pb-pareto-empty');
     const canvas = document.getElementById('pb-pareto-chart');
     const marker = document.getElementById('pb-pareto-marker');
+    const title = document.getElementById('pb-pareto-title');
+    if (title) title.textContent = 'Pareto de Desvios • ' + (fromPpt ? 'PPT' : 'Excel');
+    const legend = document.getElementById('pb-pareto-share-label');
+    if (legend) legend.textContent = fromPpt ? '■ % dos desvios em p.p.' : '■ % Desvio individual';
+    empty.textContent = fromPpt ? 'Sem desvios negativos comparáveis no PPT para esta seleção.' : 'Sem desvios comparáveis para esta seleção.';
     if (paretoChart) { paretoChart.destroy(); paretoChart = null; }
     if (!data.length) {
       empty.classList.remove('hidden');
       canvas.classList.add('hidden');
-      marker.textContent = 'Sem desvios';
+      marker.textContent = fromPpt ? 'Sem dados comparáveis' : 'Sem desvios';
       return;
     }
     empty.classList.add('hidden');
@@ -245,7 +288,7 @@
       data:{
         labels:data.map(x=>shortLabel(x.label)),
         datasets:[
-          {type:'bar',label:'% Desvio individual',data:data.map(x=>x.share),backgroundColor:['#c94a46','#f3c743','#4a9a62','#718079','#aab7b1'],borderRadius:3,yAxisID:'y'},
+          {type:'bar',label:fromPpt ? '% dos desvios em p.p. (PPT)' : '% Desvio individual',data:data.map(x=>x.share),backgroundColor:['#c94a46','#f3c743','#4a9a62','#718079','#aab7b1'],borderRadius:3,yAxisID:'y'},
           {type:'line',label:'Curva acumulada',data:data.map(x=>x.cumulative),borderColor:'#2f6e45',backgroundColor:'#2f6e45',pointBackgroundColor:data.map(x=>x.cumulative>=80?'#c94a46':'#2f6e45'),pointRadius:3,borderWidth:2,tension:.22,yAxisID:'y1'}
         ]
       },
@@ -732,7 +775,7 @@
     if(scopeKey!==lastScopeKey){resetPagination();lastScopeKey=scopeKey;}
     const summary = scopeSummary();
     renderContext(summary);
-    renderPareto();
+    renderPareto(summary);
     renderOffenders();
     renderActivities();
     renderMetrics();

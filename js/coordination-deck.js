@@ -324,6 +324,35 @@
     return slides;
   }
 
+  function summaryFor(unit, phase) {
+    const data = read();
+    if (!data?.slides?.length) return null;
+    // Only an explicit summary of the selected scope can supply its totals.
+    // In particular, do not average phase percentages across unrelated units.
+    const candidates = data.slides.filter(slide =>
+      (unit ? slide.unitCode === unit : !slide.unitCode) &&
+      (phase ? samePhase(slide.phase, phase) : !slide.phase) &&
+      (Number.isFinite(slide.planned) || Number.isFinite(slide.actual))
+    );
+    const slide = candidates.find(s => Number.isFinite(s.planned) && Number.isFinite(s.actual)) || candidates[0];
+    const dates = [...new Set(data.slides.map(s => s.dataBase).filter(Boolean))];
+    const planned = Number.isFinite(slide?.planned) ? slide.planned : null;
+    const actual = Number.isFinite(slide?.actual) ? slide.actual : null;
+    return {
+      source:'ppt',
+      planned,
+      actual,
+      variance:Number.isFinite(slide?.variance) ? slide.variance :
+        (planned !== null && actual !== null ? actual - planned : null),
+      dataBase:slide?.dataBase || (dates.length === 1 ? dates[0] : ''),
+      sourceSlide:slide?.number ?? null,
+      missingSummary:!slide,
+      message:slide ? '' : (phase && !unit
+        ? 'O PPT não traz um resumo consolidado desta fase para todas as unidades. Selecione uma unidade.'
+        : 'O PPT não traz um resumo de avanço para esta seleção.')
+    };
+  }
+
   const stop = new Set(['DE','DA','DO','DAS','DOS','E','A','O','AS','OS','EM','COM','PARA','POR','NO','NA','NOS','NAS','FASE','PROJETO','SERVICOS','SERVICO','CONSTRUCAO']);
   function tokens(value) {
     return norm(value).split(' ').filter(t => t.length>=4 && !stop.has(t));
@@ -368,6 +397,7 @@
           unitCode:slide.unitCode,
           unitName:slide.unitName,
           phase:slide.phase,
+          dataBase:slide.dataBase,
           sourceSlide:slide.number,
           kind:slide.phase ? 'phase-summary' : 'unit-summary'
         });
@@ -383,6 +413,7 @@
           unitCode:slide.unitCode,
           unitName:slide.unitName,
           phase:slide.phase,
+          dataBase:slide.dataBase,
           sourceSlide:slide.number,
           kind:'discipline'
         });
@@ -399,6 +430,7 @@
           unitCode:slide.unitCode,
           unitName:slide.unitName,
           phase:slide.phase,
+          dataBase:slide.dataBase,
           sourceSlide:slide.number,
           kind:'delivery'
         });
@@ -558,7 +590,7 @@
 
   window.CoordinationDeck={
     install,render,parse,read,clear,clearWeek,exportData,importData,
-    pagesFor,actionsFor,metricsFor,lookaheadFor,matchAction,status,audit,importedAfter
+    pagesFor,summaryFor,actionsFor,metricsFor,lookaheadFor,matchAction,status,audit,importedAfter
   };
   window.addEventListener('DOMContentLoaded',install);
   window.addEventListener('load',install);
