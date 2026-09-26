@@ -9,6 +9,12 @@
     .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
     .toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
   const clean = value => String(value == null ? '' : value).replace(/\s+/g,' ').trim();
+  const isPlaceholder = value => {
+    const raw = clean(value);
+    if (!raw) return false;
+    const compact = norm(raw).replace(/\s+/g,'');
+    return /^X{3,}$/.test(compact) || /^PREENCHER$/i.test(raw);
+  };
 
   function selectedWeek(explicitWeek) {
     const direct = Number(explicitWeek);
@@ -103,7 +109,7 @@
 
   function looksLikeTopic(block) {
     const n = norm(block.text);
-    if (!n || block.text.length > 120) return false;
+    if (!n || block.text.length > 120 || isPlaceholder(block.text)) return false;
     if (/CAUSA RAIZ|PLANO DE RECUPERACAO|PONTOS DE ATENCAO|REGISTRO FOTOGRAFICO|ACRESCENTAR DESTAQUES|REUNIAO DE COORDENACAO|RESUMO DA FASE|PREVISTO|REALIZADO|DESVIO|VALOR PREVISTO|DATA BASE|BL PLANO|ESCALA/.test(n)) return false;
     if (/^R\$|%/.test(block.text)) return false;
     const letters = block.text.replace(/[^A-Za-zÀ-ÿ]/g,'');
@@ -118,7 +124,7 @@
     blocks.forEach(b => {
       const t = clean(b.text);
       const n = norm(t);
-      if (!t || seen.has(n)) return;
+      if (!t || isPlaceholder(t) || seen.has(n)) return;
       seen.add(n);
       out.push(t);
     });
@@ -141,13 +147,13 @@
       if (!causeLabel && !planLabel) return;
       const cause = uniqueText(segment.filter(b =>
         b.x < 5500000 &&
-        b.y > (causeLabel?.y ?? topic.y) &&
+        b.y > topic.y &&
         !/CAUSA RAIZ|PLANO DE RECUPERACAO/.test(norm(b.text)) &&
         !looksLikeTopic(b)
       ));
       const plan = uniqueText(segment.filter(b =>
         b.x >= 5500000 &&
-        b.y > (planLabel?.y ?? topic.y) &&
+        b.y > topic.y &&
         !/CAUSA RAIZ|PLANO DE RECUPERACAO/.test(norm(b.text))
       ));
       if (cause || plan) actions.push({ topic: clean(topic.text), cause, plan, source:'attention' });
@@ -165,9 +171,13 @@
       const nextY = topics[index+1]?.y ?? Infinity;
       const segment = region.filter(b => b.y > topic.y && b.y < nextY && b !== topic);
       const planLabel = segment.find(b => norm(b.text) === 'PLANO DE RECUPERACAO');
-      const content = segment.filter(b => !/CAUSA RAIZ|PLANO DE RECUPERACAO/.test(norm(b.text)));
-      const cause = uniqueText(content.filter(b => !planLabel || b.y < planLabel.y));
-      const plan = uniqueText(content.filter(b => planLabel && b.y > planLabel.y));
+      const content = segment.filter(b =>
+        !/CAUSA RAIZ|PLANO DE RECUPERACAO/.test(norm(b.text)) &&
+        !isPlaceholder(b.text)
+      );
+      const tolerance = 180000;
+      const cause = uniqueText(content.filter(b => !planLabel || b.y < planLabel.y + tolerance));
+      const plan = uniqueText(content.filter(b => planLabel && b.y >= planLabel.y - tolerance));
       if (cause || plan) actions.push({ topic: clean(topic.text), cause, plan, source:'situation' });
     });
     return actions;
@@ -189,8 +199,10 @@
       if (causeIdx >= 0 && planIdx >= 0) {
         rows.slice(1).forEach(row => {
           const topic = clean(row[0]);
-          const cause = clean(row[causeIdx]);
-          const plan = clean(row[planIdx]);
+          const rawCause = clean(row[causeIdx]);
+          const rawPlan = clean(row[planIdx]);
+          const cause = isPlaceholder(rawCause) ? '' : rawCause;
+          const plan = isPlaceholder(rawPlan) ? '' : rawPlan;
           if (topic && (cause || plan)) actions.push({ topic, cause, plan, source:'table' });
         });
       } else if (first.includes('DISCIPLINA') && prevIdx >= 0 && realIdx >= 0) {
@@ -287,7 +299,7 @@
       const doc = parser.parseFromString(xml,'application/xml');
       slides.push(parseSlide(doc, Number(name.match(/slide(\d+)/)[1])));
     }
-    return { version:2, fileName:file.name, importedAt:new Date().toISOString(), slides };
+    return { version:4, fileName:file.name, importedAt:new Date().toISOString(), slides };
   }
 
   function scope() {
@@ -310,14 +322,6 @@
     else slides = slides.filter(s => !s.unitCode);
     if (phase) slides = slides.filter(s => samePhase(s.phase, phase));
     return slides;
-  }
-
-  function actionsFor(unit, phase) {
-    const data = read();
-    if (!data?.slides?.length || !unit) return [];
-    return data.slides
-      .filter(s => s.unitCode === unit && (!phase || samePhase(s.phase,phase)))
-      .flatMap(s => (s.actions || []).map(a => ({...a, unitCode:s.unitCode, unitName:s.unitName, phase:s.phase, dataBase:s.dataBase, sourceSlide:s.number})));
   }
 
   const stop = new Set(['DE','DA','DO','DAS','DOS','E','A','O','AS','OS','EM','COM','PARA','POR','NO','NA','NOS','NAS','FASE','PROJETO','SERVICOS','SERVICO','CONSTRUCAO']);
@@ -353,6 +357,22 @@
       if (!slide.unitCode) return;
       if (unit && slide.unitCode !== unit) return;
       if (phase && !samePhase(slide.phase, phase)) return;
+
+      if ((Number.isFinite(slide.planned) || Number.isFinite(slide.actual)) && (slide.phase || !phase)) {
+        rows.push({
+          topic: slide.phase ? 'Resumo da fase — ' + slide.phase : (slide.unitCode + (slide.unitName ? ' — ' + slide.unitName : '')),
+          planned:slide.planned,
+          actual:slide.actual,
+          variance:Number.isFinite(slide.variance) ? slide.variance :
+            (Number.isFinite(slide.planned) && Number.isFinite(slide.actual) ? slide.actual-slide.planned : null),
+          unitCode:slide.unitCode,
+          unitName:slide.unitName,
+          phase:slide.phase,
+          sourceSlide:slide.number,
+          kind:slide.phase ? 'phase-summary' : 'unit-summary'
+        });
+      }
+
       (slide.disciplines || []).forEach(item => {
         if (!Number.isFinite(item.planned) && !Number.isFinite(item.actual)) return;
         rows.push({
@@ -449,6 +469,26 @@
     });
   }
 
+  function audit(weekNo) {
+    const data = read(weekNo);
+    if (!data?.slides?.length) return null;
+    const actions = data.slides.flatMap(slide => slide.actions || []);
+    const metrics = metricRowsFor('', '');
+    return {
+      parserVersion:Number(data.version) || 0,
+      slides:data.slides.length,
+      unitSlides:data.slides.filter(s => s.unitCode).length,
+      phaseSlides:data.slides.filter(s => s.unitCode && s.phase).length,
+      actions:actions.length,
+      causes:actions.filter(a => clean(a.cause)).length,
+      plans:actions.filter(a => clean(a.plan)).length,
+      metrics:metrics.length,
+      disciplines:data.slides.reduce((n,s)=>n+(s.disciplines?.length||0),0),
+      deliveries:data.slides.reduce((n,s)=>n+(s.deliveries?.length||0),0),
+      equipment:data.slides.reduce((n,s)=>n+(s.equipment?.length||0),0)
+    };
+  }
+
   function status(weekNo) {
     const data=read(weekNo);
     if(!data?.slides?.length) return null;
@@ -457,7 +497,9 @@
       fileName:data.fileName || '',
       importedAt:data.importedAt || '',
       slides:data.slides.length,
-      dataBase:dates.length===1?dates[0]:(dates[0]||'')
+      dataBase:dates.length===1?dates[0]:(dates[0]||''),
+      parserVersion:Number(data.version) || 0,
+      audit:audit(weekNo)
     };
   }
 
@@ -516,7 +558,7 @@
 
   window.CoordinationDeck={
     install,render,parse,read,clear,clearWeek,exportData,importData,
-    pagesFor,actionsFor,metricsFor,lookaheadFor,matchAction,status,importedAfter
+    pagesFor,actionsFor,metricsFor,lookaheadFor,matchAction,status,audit,importedAfter
   };
   window.addEventListener('DOMContentLoaded',install);
   window.addEventListener('load',install);
