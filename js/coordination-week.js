@@ -311,7 +311,8 @@
     }
   }
 
-  function sourceStatusText(excelIso,pptIso) {
+  function sourceStatusText(excelIso,pptIso,deck) {
+    if (deck && Number(deck.parserVersion||0) < 4) return {tone:'warning',text:'Reimporte o PPT para concluir a leitura completa'};
     if(!pptIso) return {tone:'warning',text:'Sem PowerPoint salvo para esta semana'};
     if(!excelIso) return {tone:'warning',text:'Excel sem data-base comparável'};
     if(pptIso < excelIso) return {tone:'warning',text:'PPT desatualizado em relação ao Excel'};
@@ -325,14 +326,20 @@
     const deck=window.CoordinationDeck?.status?.(getSelectedWeek());
     const excelIso=modelDate(info.dataBase);
     const pptIso=modelDate(deck?.dataBase);
-    const status=sourceStatusText(excelIso,pptIso);
+    const status=sourceStatusText(excelIso,pptIso,deck);
 
     const excel=document.getElementById('pb-excel-source-status');
     const ppt=document.getElementById('pb-ppt-source-status');
     const sync=document.getElementById('pb-sync-source-status');
     const weekEl=document.getElementById('pb-week-source-status');
     if(excel) excel.innerHTML='<span>EXCEL</span><strong>Data-base '+fmtDate(excelIso)+'</strong><small>'+(info.fileName||'Sem arquivo')+'</small>';
-    if(ppt) ppt.innerHTML='<span>POWERPOINT</span><strong>Data-base '+fmtDate(pptIso)+'</strong><small>'+(deck?.fileName||'Não inserido nesta semana')+'</small>';
+    if(ppt) {
+      const audit=deck?.audit;
+      const auditText=audit
+        ? (audit.slides+' slides • '+audit.actions+' ações • '+audit.metrics+' métricas'+(audit.equipment?' • '+audit.equipment+' materiais':''))
+        : '';
+      ppt.innerHTML='<span>POWERPOINT</span><strong>Data-base '+fmtDate(pptIso)+'</strong><small>'+(deck?.fileName||'Não inserido nesta semana')+(auditText?' • '+auditText:'')+'</small>';
+    }
     if(sync){sync.dataset.tone=status.tone;sync.innerHTML='<span>STATUS</span><strong>'+status.text+'</strong><small>'+(usingLiveDraft?'Excel atual em preparação • ainda não salvo':'')+'</small>';}
     if(weekEl && week) {
       const state=week.is_locked?'FECHADA • somente leitura':(canEdit()?'EDIÇÃO LIBERADA':'visualização');
